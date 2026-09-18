@@ -1,0 +1,40 @@
+{
+  "name": "max-shamaev-php/bundle-standard",
+  "license": "MIT",
+  "type": "library",
+  "description": "Shared quality standard for max-shamaev-php Symfony bundles",
+  "minimum-stability": "stable",
+  "keywords": ["php", "symfony", "standard", "ci"],
+  "prefer-stable": true,
+  "autoload": {
+    "psr-4": {
+      "MaxShamaev\\BundleStandard\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "MaxShamaev\\BundleStandard\\Test\\Unit\\": "tests/unit/"
+    }
+  },
+  "require": {
+    "php": ">=8.4",
+    "ext-json": "*"
+  },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^3.55",
+    "phpstan/extension-installer": "^1.4",
+    "phpstan/phpstan": "^2.1",
+    "phpstan/phpstan-strict-rules": "^2.0",
+    "phpunit/phpunit": ">=10.5",
+    "roave/security-advisories": "dev-latest"
+  },
+  "bin": [
+    "bin/verify-standard.php"
+  ],
+  "config": {
+    "allow-plugins": {
+      "phpstan/extension-installer": true
+    },
+    "sort-packages": true
+  }
+}
