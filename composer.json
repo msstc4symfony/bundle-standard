@@ -1,6 +1,12 @@
 {
   "name": "msstc4symfony/bundle-standard",
   "license": "MIT",
+  "authors": [
+    {
+      "name": "Maxim Shamaev",
+      "email": "maxim.shamaev@gmail.com"
+    }
+  ],
   "type": "library",
   "description": "Shared quality standard for msstc4symfony Symfony bundles",
   "minimum-stability": "stable",

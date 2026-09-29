@@ -14,6 +14,10 @@ final readonly class ComposerManifestRule implements RuleInterface
 
     private const string VENDOR = 'msstc4symfony';
 
+    private const string AUTHOR_NAME = 'Maxim Shamaev';
+
+    private const string AUTHOR_EMAIL = 'maxim.shamaev@gmail.com';
+
     private const string PHP_CONSTRAINT = '>=8.4';
 
     private const string SYMFONY_CONSTRAINT = '^6.4|^7.0|^8.0';
@@ -59,6 +63,7 @@ final readonly class ComposerManifestRule implements RuleInterface
             ...$this->checkVersionField($manifest),
             ...$this->checkVendor($manifest),
             ...$this->checkLicense($manifest),
+            ...$this->checkAuthor($manifest),
             ...$this->checkPhpConstraint($manifest),
             ...$this->checkDevAutoload($manifest),
             ...$this->checkSymfonyConstraints($manifest),
@@ -125,6 +130,31 @@ final readonly class ComposerManifestRule implements RuleInterface
         return [new Violation(
             self::FILE,
             sprintf('must be licensed MIT, found "%s"', is_string($license) ? $license : 'none'),
+        )];
+    }
+
+    /**
+     * @param array<string, mixed> $manifest
+     *
+     * @return list<Violation>
+     */
+    private function checkAuthor(array $manifest): array
+    {
+        $authors = $manifest['authors'] ?? [];
+
+        foreach (is_array($authors) ? $authors : [] as $author) {
+            if (
+                is_array($author)
+                && ($author['name'] ?? null) === self::AUTHOR_NAME
+                && ($author['email'] ?? null) === self::AUTHOR_EMAIL
+            ) {
+                return [];
+            }
+        }
+
+        return [new Violation(
+            self::FILE,
+            sprintf('must list author "%s <%s>"', self::AUTHOR_NAME, self::AUTHOR_EMAIL),
         )];
     }
 

@@ -73,7 +73,9 @@ among other things:
   `failOnRisky="true"`), while still allowing bundle-specific additions
   (skip lists, exclude paths).
 - `composer.json` declares no `version` field, lives under the
-  `msstc4symfony` vendor, is licensed MIT, requires `php: >=8.4`, and
+  `msstc4symfony` vendor, is licensed MIT, lists
+  `Maxim Shamaev <maxim.shamaev@gmail.com>` among its `authors`, requires
+  `php: >=8.4`, and
   keeps its `autoload-dev` namespace under the package's own root
   namespace.
 - `composer-ci.json`, `phpstan-baseline.neon`, `deptrac.yaml`,

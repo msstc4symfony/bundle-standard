@@ -7,11 +7,14 @@ namespace Msstc4Symfony\BundleStandard\Test\Unit\Rule;
 use Msstc4Symfony\BundleStandard\Rule\ComposerManifestRule;
 use Msstc4Symfony\BundleStandard\Violation;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(ComposerManifestRule::class)]
 final class ComposerManifestRuleTest extends TestCase
 {
+    private const array AUTHOR = ['name' => 'Maxim Shamaev', 'email' => 'maxim.shamaev@gmail.com'];
+
     /** @var non-empty-string */
     private string $bundleDir;
 
@@ -43,11 +46,23 @@ final class ComposerManifestRuleTest extends TestCase
         );
     }
 
+    /**
+     * @return list<string>
+     */
+    private function messages(): array
+    {
+        return array_map(
+            static fn (Violation $v): string => $v->message,
+            (new ComposerManifestRule())->check($this->bundleDir),
+        );
+    }
+
     public function testPassesOnCompliantManifest(): void
     {
         $this->writeManifest([
             'name' => 'msstc4symfony/logger-bundle',
             'license' => 'MIT',
+            'authors' => [self::AUTHOR],
             'require' => ['php' => '>=8.4', 'symfony/framework-bundle' => '^6.4|^7.0|^8.0'],
             'conflict' => ['symfony/symfony' => '*'],
             'extra' => ['symfony' => ['require' => '^6.4|^7.0|^8.0']],
@@ -148,6 +163,41 @@ final class ComposerManifestRuleTest extends TestCase
         self::assertContains('must be licensed MIT, found "none"', $messages);
     }
 
+    public function testAcceptsAuthorAmongOtherAuthors(): void
+    {
+        $this->writeManifest([
+            'name' => 'msstc4symfony/logger-bundle',
+            'authors' => [['name' => 'Someone Else'], self::AUTHOR],
+        ]);
+
+        self::assertNotContains(
+            'must list author "Maxim Shamaev <maxim.shamaev@gmail.com>"',
+            $this->messages(),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $authors
+     */
+    #[DataProvider('provideNonCompliantAuthors')]
+    public function testReportsMissingOrWrongAuthor(array $authors): void
+    {
+        $this->writeManifest(['name' => 'msstc4symfony/logger-bundle', ...$authors]);
+
+        self::assertContains('must list author "Maxim Shamaev <maxim.shamaev@gmail.com>"', $this->messages());
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function provideNonCompliantAuthors(): iterable
+    {
+        yield 'absent' => [[]];
+        yield 'not a list' => [['authors' => 'Maxim Shamaev']];
+        yield 'wrong email' => [['authors' => [['name' => 'Maxim Shamaev', 'email' => 'other@example.com']]]];
+        yield 'email missing' => [['authors' => [['name' => 'Maxim Shamaev']]]];
+    }
+
     public function testReportsMissingPhpRequirementAsNone(): void
     {
         $this->writeManifest([
@@ -219,6 +269,7 @@ final class ComposerManifestRuleTest extends TestCase
         $this->writeManifest([
             'name' => 'msstc4symfony/logger-bundle',
             'license' => 'MIT',
+            'authors' => [self::AUTHOR],
             'require' => [
                 'php' => '>=8.4',
                 'symfony/framework-bundle' => '^6.4|^7.0|^8.0',
