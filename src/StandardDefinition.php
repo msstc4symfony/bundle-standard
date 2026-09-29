@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\BundleStandard;
+namespace Msstc4Symfony\BundleStandard;
 
-use MaxShamaev\BundleStandard\Rule\ComposerManifestRule;
-use MaxShamaev\BundleStandard\Rule\ContainsRule;
-use MaxShamaev\BundleStandard\Rule\ExactFileRule;
-use MaxShamaev\BundleStandard\Rule\FileAbsentRule;
-use MaxShamaev\BundleStandard\Rule\FileExistsRule;
-use MaxShamaev\BundleStandard\Rule\RuleInterface;
+use Msstc4Symfony\BundleStandard\Rule\ComposerManifestRule;
+use Msstc4Symfony\BundleStandard\Rule\ContainsRule;
+use Msstc4Symfony\BundleStandard\Rule\ExactFileRule;
+use Msstc4Symfony\BundleStandard\Rule\FileAbsentRule;
+use Msstc4Symfony\BundleStandard\Rule\FileExistsRule;
+use Msstc4Symfony\BundleStandard\Rule\RuleInterface;
 
 final readonly class StandardDefinition
 {

@@ -3,7 +3,7 @@
 ## Что это и как запускается
 
 `bundle-standard` — верификатор общего стандарта качества для семейства
-Symfony-бандлов `max-shamaev-php`. Точка входа —
+Symfony-бандлов `msstc4symfony`. Точка входа —
 `bin/verify-standard.php <path-to-bundle>`:
 
 - `exit(0)` — бандл соответствует стандарту.
@@ -45,7 +45,7 @@ interface RuleInterface
   передаётся текстом и попадает в сообщение о нарушении).
 - `FileAbsentRule` — файл должен отсутствовать.
 - `ComposerManifestRule` — точечные проверки `composer.json`: нет поля
-  `version`, вендор `max-shamaev-php`, лицензия `MIT`, `require.php`
+  `version`, вендор `msstc4symfony`, лицензия `MIT`, `require.php`
   строго `>=8.4`, `autoload-dev.psr-4` не содержит чужих неймспейсов
   (защита от copy-paste, когда в новый бандл случайно попадает
   тестовый неймспейс другого бандла).

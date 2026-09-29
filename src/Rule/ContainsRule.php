@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\BundleStandard\Rule;
+namespace Msstc4Symfony\BundleStandard\Rule;
 
-use MaxShamaev\BundleStandard\Violation;
+use Msstc4Symfony\BundleStandard\Violation;
 use Override;
 
 final readonly class ContainsRule implements RuleInterface

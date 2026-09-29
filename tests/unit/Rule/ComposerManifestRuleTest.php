@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\BundleStandard\Test\Unit\Rule;
+namespace Msstc4Symfony\BundleStandard\Test\Unit\Rule;
 
-use MaxShamaev\BundleStandard\Rule\ComposerManifestRule;
-use MaxShamaev\BundleStandard\Violation;
+use Msstc4Symfony\BundleStandard\Rule\ComposerManifestRule;
+use Msstc4Symfony\BundleStandard\Violation;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -46,7 +46,7 @@ final class ComposerManifestRuleTest extends TestCase
     public function testPassesOnCompliantManifest(): void
     {
         $this->writeManifest([
-            'name' => 'max-shamaev-php/logger-bundle',
+            'name' => 'msstc4symfony/logger-bundle',
             'license' => 'MIT',
             'require' => ['php' => '>=8.4', 'symfony/framework-bundle' => '^6.4|^7.0|^8.0'],
             'conflict' => ['symfony/symfony' => '*'],
@@ -61,7 +61,7 @@ final class ComposerManifestRuleTest extends TestCase
     public function testReportsVersionField(): void
     {
         $this->writeManifest([
-            'name' => 'max-shamaev-php/logger-bundle',
+            'name' => 'msstc4symfony/logger-bundle',
             'version' => '1.0.1',
             'license' => 'MIT',
             'require' => ['php' => '>=8.4'],
@@ -79,7 +79,7 @@ final class ComposerManifestRuleTest extends TestCase
     public function testReportsForeignDevAutoloadNamespace(): void
     {
         $this->writeManifest([
-            'name' => 'max-shamaev-php/logger-bundle',
+            'name' => 'msstc4symfony/logger-bundle',
             'license' => 'MIT',
             'require' => ['php' => '>=8.4'],
             'autoload' => ['psr-4' => ['MaxShamaev\\LoggerBundle\\' => 'src/']],
@@ -112,7 +112,7 @@ final class ComposerManifestRuleTest extends TestCase
         );
 
         self::assertContains('must be licensed MIT, found "proprietary"', $messages);
-        self::assertContains('must live under the "max-shamaev-php" vendor, found "hot-ecosystem"', $messages);
+        self::assertContains('must live under the "msstc4symfony" vendor, found "hot-ecosystem"', $messages);
         self::assertContains('must require php ">=8.4", found ">=8.1"', $messages);
     }
 
@@ -135,7 +135,7 @@ final class ComposerManifestRuleTest extends TestCase
     public function testReportsMissingLicenseAsNone(): void
     {
         $this->writeManifest([
-            'name' => 'max-shamaev-php/logger-bundle',
+            'name' => 'msstc4symfony/logger-bundle',
             'require' => ['php' => '>=8.4'],
             'autoload' => ['psr-4' => ['MaxShamaev\\LoggerBundle\\' => 'src/']],
         ]);
@@ -151,7 +151,7 @@ final class ComposerManifestRuleTest extends TestCase
     public function testReportsMissingPhpRequirementAsNone(): void
     {
         $this->writeManifest([
-            'name' => 'max-shamaev-php/logger-bundle',
+            'name' => 'msstc4symfony/logger-bundle',
             'license' => 'MIT',
             'require' => [],
             'autoload' => ['psr-4' => ['MaxShamaev\\LoggerBundle\\' => 'src/']],
@@ -168,7 +168,7 @@ final class ComposerManifestRuleTest extends TestCase
     public function testReportsMissingAutoloadRootNamespace(): void
     {
         $this->writeManifest([
-            'name' => 'max-shamaev-php/logger-bundle',
+            'name' => 'msstc4symfony/logger-bundle',
             'license' => 'MIT',
             'require' => ['php' => '>=8.4'],
         ]);
@@ -195,7 +195,7 @@ final class ComposerManifestRuleTest extends TestCase
     public function testReportsWrongSymfonyConstraint(): void
     {
         $this->writeManifest([
-            'name' => 'max-shamaev-php/tracing-bundle',
+            'name' => 'msstc4symfony/tracing-bundle',
             'license' => 'MIT',
             'require' => ['php' => '>=8.4', 'symfony/framework-bundle' => '^7.2'],
             'conflict' => ['symfony/symfony' => '*'],
@@ -217,7 +217,7 @@ final class ComposerManifestRuleTest extends TestCase
     public function testDoesNotFlagNonLockstepSymfonyPackages(): void
     {
         $this->writeManifest([
-            'name' => 'max-shamaev-php/logger-bundle',
+            'name' => 'msstc4symfony/logger-bundle',
             'license' => 'MIT',
             'require' => [
                 'php' => '>=8.4',
@@ -235,7 +235,7 @@ final class ComposerManifestRuleTest extends TestCase
     public function testReportsMissingConflict(): void
     {
         $this->writeManifest([
-            'name' => 'max-shamaev-php/tracing-bundle',
+            'name' => 'msstc4symfony/tracing-bundle',
             'license' => 'MIT',
             'require' => ['php' => '>=8.4', 'symfony/framework-bundle' => '^6.4|^7.0|^8.0'],
             'extra' => ['symfony' => ['require' => '^6.4|^7.0|^8.0']],
@@ -253,7 +253,7 @@ final class ComposerManifestRuleTest extends TestCase
     public function testReportsMissingExtraSymfonyRequire(): void
     {
         $this->writeManifest([
-            'name' => 'max-shamaev-php/tracing-bundle',
+            'name' => 'msstc4symfony/tracing-bundle',
             'license' => 'MIT',
             'require' => ['php' => '>=8.4', 'symfony/framework-bundle' => '^6.4|^7.0|^8.0'],
             'conflict' => ['symfony/symfony' => '*'],

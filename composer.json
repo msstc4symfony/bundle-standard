@@ -1,19 +1,19 @@
 {
-  "name": "max-shamaev-php/bundle-standard",
+  "name": "msstc4symfony/bundle-standard",
   "license": "MIT",
   "type": "library",
-  "description": "Shared quality standard for max-shamaev-php Symfony bundles",
+  "description": "Shared quality standard for msstc4symfony Symfony bundles",
   "minimum-stability": "stable",
   "keywords": ["php", "symfony", "standard", "ci"],
   "prefer-stable": true,
   "autoload": {
     "psr-4": {
-      "MaxShamaev\\BundleStandard\\": "src/"
+      "Msstc4Symfony\\BundleStandard\\": "src/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "MaxShamaev\\BundleStandard\\Test\\Unit\\": "tests/unit/"
+      "Msstc4Symfony\\BundleStandard\\Test\\Unit\\": "tests/unit/"
     }
   },
   "require": {

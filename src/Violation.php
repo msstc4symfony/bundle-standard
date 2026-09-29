@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\BundleStandard;
+namespace Msstc4Symfony\BundleStandard;
 
 use InvalidArgumentException;
 

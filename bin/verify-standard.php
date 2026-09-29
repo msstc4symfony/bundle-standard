@@ -3,10 +3,10 @@
 
 declare(strict_types=1);
 
-use MaxShamaev\BundleStandard\StandardDefinition;
-use MaxShamaev\BundleStandard\Verifier;
+use Msstc4Symfony\BundleStandard\StandardDefinition;
+use Msstc4Symfony\BundleStandard\Verifier;
 
-// Installed as a dependency, this file sits at vendor/max-shamaev-php/bundle-standard/bin/;
+// Installed as a dependency, this file sits at vendor/msstc4symfony/bundle-standard/bin/;
 // autoload.php is three levels up. Running from the repo checkout, it is one level up.
 $installedAutoload = __DIR__ . '/../../../autoload.php';
 $repoAutoload = __DIR__ . '/../vendor/autoload.php';

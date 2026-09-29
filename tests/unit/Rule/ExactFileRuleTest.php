@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\BundleStandard\Test\Unit\Rule;
+namespace Msstc4Symfony\BundleStandard\Test\Unit\Rule;
 
-use MaxShamaev\BundleStandard\Rule\ExactFileRule;
+use Msstc4Symfony\BundleStandard\Rule\ExactFileRule;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 

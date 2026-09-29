@@ -1,9 +1,9 @@
 # Bundle Standard
 
-Shared quality standard for `max-shamaev-php` Symfony bundles.
+Shared quality standard for `msstc4symfony` Symfony bundles.
 
 This repository is the single source of truth for what "compliant with the
-`max-shamaev-php` standard" means for a bundle: which files must exist,
+`msstc4symfony` standard" means for a bundle: which files must exist,
 which must be byte-identical to a reference template, which must contain
 specific settings, and which must not exist at all. It ships two things:
 
@@ -20,7 +20,7 @@ specific settings, and which must not exist at all. It ships two things:
 The reusable workflow below is written to be consumed as:
 
 ```yaml
-uses: max-shamaev-php/bundle-standard/.github/workflows/php-bundle.yml@v1
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1
 ```
 
 **That `v1` tag does not exist yet.** This repository currently lives only
@@ -73,7 +73,7 @@ among other things:
   `failOnRisky="true"`), while still allowing bundle-specific additions
   (skip lists, exclude paths).
 - `composer.json` declares no `version` field, lives under the
-  `max-shamaev-php` vendor, is licensed MIT, requires `php: >=8.4`, and
+  `msstc4symfony` vendor, is licensed MIT, requires `php: >=8.4`, and
   keeps its `autoload-dev` namespace under the package's own root
   namespace.
 - `composer-ci.json`, `phpstan-baseline.neon`, `deptrac.yaml`,
@@ -102,9 +102,9 @@ concurrency:
 
 jobs:
   standard:
-    uses: max-shamaev-php/bundle-standard/.github/workflows/php-bundle.yml@v1
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1
     with:
-      slug: max-shamaev-php/healthcheck-bundle
+      slug: msstc4symfony/healthcheck-bundle
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 ```

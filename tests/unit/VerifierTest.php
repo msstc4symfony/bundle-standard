@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\BundleStandard\Test\Unit;
+namespace Msstc4Symfony\BundleStandard\Test\Unit;
 
-use MaxShamaev\BundleStandard\Rule\RuleInterface;
-use MaxShamaev\BundleStandard\Verifier;
-use MaxShamaev\BundleStandard\Violation;
+use Msstc4Symfony\BundleStandard\Rule\RuleInterface;
+use Msstc4Symfony\BundleStandard\Verifier;
+use Msstc4Symfony\BundleStandard\Violation;
 use Override;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;

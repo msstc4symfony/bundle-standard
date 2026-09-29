@@ -53,7 +53,7 @@ jobs:
 
       - uses: actions/checkout@v5
         with:
-          repository: max-shamaev-php/bundle-standard
+          repository: msstc4symfony/bundle-standard
           ref: v1
           path: standard
 

@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\BundleStandard\Rule;
+namespace Msstc4Symfony\BundleStandard\Rule;
 
 use JsonException;
-use MaxShamaev\BundleStandard\Violation;
+use Msstc4Symfony\BundleStandard\Violation;
 use Override;
 
 final readonly class ComposerManifestRule implements RuleInterface
 {
     private const string FILE = 'composer.json';
 
-    private const string VENDOR = 'max-shamaev-php';
+    private const string VENDOR = 'msstc4symfony';
 
     private const string PHP_CONSTRAINT = '>=8.4';
 

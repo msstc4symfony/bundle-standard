@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\BundleStandard\Test\Unit;
+namespace Msstc4Symfony\BundleStandard\Test\Unit;
 
 use InvalidArgumentException;
-use MaxShamaev\BundleStandard\Violation;
+use Msstc4Symfony\BundleStandard\Violation;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
