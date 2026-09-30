@@ -22,7 +22,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.3.1
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.4.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -104,7 +104,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.3.1
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.4.0
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:
@@ -119,6 +119,7 @@ Inputs (all optional except `slug`):
 | `php-versions` | `["8.4","8.5"]` | JSON array of PHP versions for the PHPUnit matrix. |
 | `symfony-versions` | 6.4 / 7.4 / 8.x, coverage on 8.x | JSON array of `{version,label,codecov}` objects. |
 | `extensions` | `mbstring, xml, ctype, iconv, intl` | PHP extensions installed for the bundle's test suite. |
+| `ini-values` | `''` | `php.ini` overrides for jobs running bundle code, e.g. `apc.enable_cli=1`. |
 | `run-deptrac` | `true` | Run the DEPTRAC layer-rules job. |
 | `run-infection` | `true` | Run Infection mutation testing (push to `main` only). |
 | `run-bc-check` | `true` | Run the Roave backward-compatibility check. |
