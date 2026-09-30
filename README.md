@@ -22,7 +22,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.4.0
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.5.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -73,7 +73,7 @@ among other things:
 - `composer.json` declares no `version` field, lives under the
   `msstc4symfony` vendor, is licensed MIT, lists
   `Maxim Shamaev <maxim.shamaev@gmail.com>` among its `authors`, requires
-  `php: >=8.4`, and
+  `php: >=8.4`, requires `symfony/yaml` when `src/` uses `YamlFileLoader`, and
   keeps its `autoload-dev` namespace under the package's own root
   namespace.
 - `composer-ci.json`, `phpstan-baseline.neon`, `deptrac.yaml`,
@@ -104,7 +104,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.4.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.5.0
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:

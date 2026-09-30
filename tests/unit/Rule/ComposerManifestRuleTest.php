@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\BundleStandard\Test\Unit\Rule;
 
+use FilesystemIterator;
 use Msstc4Symfony\BundleStandard\Rule\ComposerManifestRule;
 use Msstc4Symfony\BundleStandard\Violation;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use SplFileInfo;
 
 #[CoversClass(ComposerManifestRule::class)]
 final class ComposerManifestRuleTest extends TestCase
@@ -26,13 +30,24 @@ final class ComposerManifestRuleTest extends TestCase
 
     protected function tearDown(): void
     {
-        $files = glob($this->bundleDir . '/*');
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($this->bundleDir, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST,
+        );
 
-        foreach (($files !== false ? $files : []) as $file) {
-            unlink($file);
+        foreach ($files as $file) {
+            if ($file instanceof SplFileInfo) {
+                $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
+            }
         }
 
         rmdir($this->bundleDir);
+    }
+
+    private function writeExtension(string $body): void
+    {
+        mkdir($this->bundleDir . '/src/DependencyInjection', 0o777, true);
+        file_put_contents($this->bundleDir . '/src/DependencyInjection/FooExtension.php', "<?php\n" . $body);
     }
 
     /**
@@ -196,6 +211,42 @@ final class ComposerManifestRuleTest extends TestCase
         yield 'not a list' => [['authors' => 'Maxim Shamaev']];
         yield 'wrong email' => [['authors' => [['name' => 'Maxim Shamaev', 'email' => 'other@example.com']]]];
         yield 'email missing' => [['authors' => [['name' => 'Maxim Shamaev']]]];
+    }
+
+    public function testReportsYamlLoaderWithoutSymfonyYaml(): void
+    {
+        $this->writeManifest(['name' => 'msstc4symfony/foo-bundle', 'require' => ['php' => '>=8.4']]);
+        $this->writeExtension('new YamlFileLoader($container, $locator);');
+
+        self::assertContains(
+            'must require symfony/yaml: src/ loads configuration with YamlFileLoader',
+            $this->messages(),
+        );
+    }
+
+    public function testAcceptsYamlLoaderWithSymfonyYaml(): void
+    {
+        $this->writeManifest([
+            'name' => 'msstc4symfony/foo-bundle',
+            'require' => ['php' => '>=8.4', 'symfony/yaml' => '^6.4|^7.0|^8.0'],
+        ]);
+        $this->writeExtension('new YamlFileLoader($container, $locator);');
+
+        self::assertNotContains(
+            'must require symfony/yaml: src/ loads configuration with YamlFileLoader',
+            $this->messages(),
+        );
+    }
+
+    public function testIgnoresBundlesWithoutYamlLoader(): void
+    {
+        $this->writeManifest(['name' => 'msstc4symfony/foo-bundle', 'require' => ['php' => '>=8.4']]);
+        $this->writeExtension('new PhpFileLoader($container, $locator);');
+
+        self::assertNotContains(
+            'must require symfony/yaml: src/ loads configuration with YamlFileLoader',
+            $this->messages(),
+        );
     }
 
     public function testReportsMissingPhpRequirementAsNone(): void

@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\BundleStandard\Rule;
 
+use FilesystemIterator;
 use JsonException;
 use Msstc4Symfony\BundleStandard\Violation;
 use Override;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use SplFileInfo;
 
 final readonly class ComposerManifestRule implements RuleInterface
 {
@@ -69,6 +73,7 @@ final readonly class ComposerManifestRule implements RuleInterface
             ...$this->checkSymfonyConstraints($manifest),
             ...$this->checkConflict($manifest),
             ...$this->checkExtraSymfonyRequire($manifest),
+            ...$this->checkYamlLoaderDependency($bundlePath, $manifest),
         ];
     }
 
@@ -295,6 +300,52 @@ final readonly class ComposerManifestRule implements RuleInterface
         }
 
         return [new Violation(self::FILE, 'must declare extra.symfony.require')];
+    }
+
+    /**
+     * A bundle that loads its service config through YamlFileLoader crashes at container
+     * build time in any application that does not happen to pull symfony/yaml transitively.
+     *
+     * @param array<string, mixed> $manifest
+     *
+     * @return list<Violation>
+     */
+    private function checkYamlLoaderDependency(string $bundlePath, array $manifest): array
+    {
+        $require = $manifest['require'] ?? [];
+
+        if (is_array($require) && array_key_exists('symfony/yaml', $require)) {
+            return [];
+        }
+
+        if (!$this->sourceUses($bundlePath . '/src', 'YamlFileLoader')) {
+            return [];
+        }
+
+        return [new Violation(self::FILE, 'must require symfony/yaml: src/ loads configuration with YamlFileLoader')];
+    }
+
+    private function sourceUses(string $directory, string $needle): bool
+    {
+        if (!is_dir($directory)) {
+            return false;
+        }
+
+        $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS));
+
+        foreach ($files as $file) {
+            if (!$file instanceof SplFileInfo || $file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $content = file_get_contents($file->getPathname());
+
+            if ($content !== false && str_contains($content, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
