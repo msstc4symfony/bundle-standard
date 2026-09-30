@@ -15,25 +15,23 @@ specific settings, and which must not exist at all. It ships two things:
    `composer audit`, the PHPUnit matrix, an optional Roave BC check, and
    optional Infection mutation testing) for any bundle that calls it.
 
-## Status: not yet published
+## Versioning
 
-The reusable workflow below is written to be consumed as:
+Releases are three-part semver tags (`v1.0.0`, `v1.1.0`, …). Consumer bundles
+pin the exact tag, never `@main`: an error pushed to this repository's `main`
+would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.0.0
 ```
 
-**That `v1` tag does not exist yet.** This repository currently lives only
-on this machine, with no `git remote` and no tags — nothing has been
-pushed to GitHub. The workflow file is written now so it is ready the
-moment the repository is published and tagged; until then, no consumer
-bundle can actually resolve the `@v1` reference. Do not wire a bundle's CI
-to this workflow before publication.
+GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
+standard is a deliberate per-bundle bump of this tag.
 
-Consumer bundles must pin a tag (`@v1`), never `@main`: an error pushed to
-this repository's `main` would otherwise break CI in every bundle that
-depends on it at once. Pinning a tag makes upgrading to a new standard
-version a deliberate, per-bundle action instead of an involuntary one.
+The workflow's `standard-check` job checks out this repository at a hard-coded
+`ref:`. That value must equal the release tag: when releasing, bump it in
+`.github/workflows/php-bundle.yml` in the same commit that gets tagged.
+`ReusableWorkflowTest` fails if the workflow and this README disagree.
 
 ## Verifying a bundle
 
@@ -104,7 +102,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.0.0
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:
@@ -125,7 +123,7 @@ Inputs (all optional except `slug`):
 
 A consumer bundle does **not** need `bundle-standard` as a composer
 dependency: the workflow's `standard-check` job checks out this
-repository at `ref: v1` on its own and runs the verifier against the
+repository at the release tag on its own and runs the verifier against the
 bundle's checkout.
 
 ## Templates
