@@ -59,7 +59,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: msstc4symfony/bundle-standard
-          ref: v1.2.0
+          ref: v1.3.0
           path: standard
 
       - uses: shivammathur/setup-php@v2
@@ -297,6 +297,18 @@ jobs:
 
       - name: Resolve dependencies
         run: composer update --prefer-dist --no-progress --no-interaction
+
+      # Pinning framework-bundle alone lets Composer keep the rest of symfony/* on an
+      # older major when a dependency caps it, silently turning the cell into a lie.
+      - name: Assert the matrix Symfony version was installed
+        env:
+          SYMFONY_LABEL: ${{ matrix.symfony.label }}
+        run: |
+          installed=$(composer show symfony/http-kernel --format=json | jq -r '.versions[0]')
+          case "$installed" in
+            "v${SYMFONY_LABEL}".*) echo "symfony/http-kernel ${installed}" ;;
+            *) echo "::error::Matrix expects Symfony ${SYMFONY_LABEL}, resolved symfony/http-kernel ${installed}: a dependency caps Symfony below the matrix version"; exit 1 ;;
+          esac
 
       - run: XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit junit.xml
 
