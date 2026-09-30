@@ -22,7 +22,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.0.0
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.1.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -102,7 +102,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.0.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.1.0
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:
@@ -120,6 +120,7 @@ Inputs (all optional except `slug`):
 | `run-deptrac` | `true` | Run the DEPTRAC layer-rules job. |
 | `run-infection` | `true` | Run Infection mutation testing (push to `main` only). |
 | `run-bc-check` | `true` | Run the Roave backward-compatibility check. |
+| `run-codecov` | `false` | Upload coverage and test results to Codecov; requires the `CODECOV_TOKEN` secret. |
 
 A consumer bundle does **not** need `bundle-standard` as a composer
 dependency: the workflow's `standard-check` job checks out this
