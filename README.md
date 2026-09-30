@@ -22,7 +22,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.1.0
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.2.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -79,6 +79,8 @@ among other things:
 - `composer-ci.json`, `phpstan-baseline.neon`, `deptrac.yaml`,
   `infection.json5`, `codecov.yml`, `LICENSE`, `SECURITY.md`, `README.md`,
   and `CLAUDE.md` are present.
+- `.github/workflows/checks.yml` calls `php-bundle.yml` pinned to a release
+  tag (`@vX.Y.Z`, never `@main`).
 - `psalm.xml` and `psalm-baseline.xml` are absent — the standard uses
   PHPStan only.
 
@@ -102,7 +104,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.1.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.2.0
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:

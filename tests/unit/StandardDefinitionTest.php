@@ -41,6 +41,7 @@ final class StandardDefinitionTest extends TestCase
             self::assertContains('composer.json', $files);
             self::assertContains('deptrac.yaml', $files);
             self::assertContains('infection.json5', $files);
+            self::assertContains('.github/workflows/checks.yml', $files);
         } finally {
             rmdir($emptyDir);
         }
@@ -48,10 +49,10 @@ final class StandardDefinitionTest extends TestCase
 
     public function testAcceptsTheReferenceBundle(): void
     {
-        $reference = __DIR__ . '/../../../healthcheck-bundle';
+        $reference = __DIR__ . '/../../../logger-bundle';
 
         if (!is_dir($reference)) {
-            self::markTestSkipped('healthcheck-bundle checkout is not available next to bundle-standard');
+            self::markTestSkipped('logger-bundle checkout is not available next to bundle-standard');
         }
 
         $violations = (new Verifier(StandardDefinition::rules(self::TEMPLATES_DIR)))->verify($reference);

@@ -51,6 +51,11 @@ final readonly class StandardDefinition
                 'beStrictAboutOutputDuringTests="true"',
             ]),
 
+            // Pinned to a release tag, never @main: see README "Versioning".
+            new ContainsRule('.github/workflows/checks.yml', [
+                'uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v',
+            ]),
+
             new ComposerManifestRule(),
 
             new FileExistsRule('composer-ci.json', 'CI installs the full optional dependency set'),
