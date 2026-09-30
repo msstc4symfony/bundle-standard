@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    name: PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.4', '8.5']
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, json
+          coverage: none
+          tools: composer:v2
+
+      - run: composer validate --strict --no-check-publish
+
+      - run: composer update --prefer-dist --no-progress --no-interaction
+
+      - if: matrix.php == '8.4'
+        run: vendor/bin/php-cs-fixer check
+
+      - run: vendor/bin/phpstan analyse --no-progress
+
+      - run: vendor/bin/phpunit
