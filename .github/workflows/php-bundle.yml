@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: msstc4symfony/bundle-standard
-          ref: v1.6.0
+          ref: v1.6.1
           path: standard
 
       - uses: shivammathur/setup-php@v2
@@ -381,7 +381,10 @@ jobs:
       # one; older tags predate composer-ci.json and fall back to composer.json.
       - name: Roave BC check
         run: |
-          base=$(git describe --tags --abbrev=0)
+          if ! base=$(git describe --tags --abbrev=0 2>/dev/null); then
+            echo "No release tag yet: nothing to compare against."
+            exit 0
+          fi
           if git cat-file -e "${base}:composer-ci.json" 2>/dev/null; then
             export COMPOSER=composer-ci.json
           else
