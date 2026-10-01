@@ -23,33 +23,18 @@ final readonly class StandardDefinition
         $templatesDir = rtrim($templatesDir, '/');
 
         return [
+            // Byte-identical across bundles: bundle specifics belong in deptrac.yaml,
+            // phpstan-baseline.neon, composer manifests and the workflow inputs.
             new ExactFileRule('.php-cs-fixer.dist.php', $templatesDir . '/.php-cs-fixer.dist.php'),
             new ExactFileRule('phpstan-ci.neon', $templatesDir . '/phpstan-ci.neon'),
-
-            new ContainsRule('rector.php', ['withPhpSets(php84: true)']),
-            new ContainsRule('phpstan.dist.neon', [
-                'level: 9',
-                'phpVersion: 80400',
-                'treatPhpDocTypesAsCertain: false',
-            ]),
-            // Invariant, not byte-identity: bundles are allowed extra targets
-            // (e.g. metrics-bundle's integration-test targets) as long as the
-            // mandatory seven are present.
-            new ContainsRule('Makefile', [
-                'check:',
-                'test:',
-                'test-with-coverage:',
-                'infection:',
-                'regenerate-baseline:',
-                'fix:',
-                'help:',
-            ]),
-            new ContainsRule('phpunit.xml.dist', [
-                'failOnRisky="true"',
-                'failOnWarning="true"',
-                'failOnPhpunitDeprecation="true"',
-                'beStrictAboutOutputDuringTests="true"',
-            ]),
+            new ExactFileRule('phpstan.dist.neon', $templatesDir . '/phpstan.dist.neon'),
+            new ExactFileRule('rector.php', $templatesDir . '/rector.php'),
+            new ExactFileRule('Makefile', $templatesDir . '/Makefile'),
+            new ExactFileRule('phpunit.xml.dist', $templatesDir . '/phpunit.xml.dist'),
+            new ExactFileRule('infection.json5', $templatesDir . '/infection.json5'),
+            new ExactFileRule('codecov.yml', $templatesDir . '/codecov.yml'),
+            // Stored without the leading dot so the template itself is not a live ignore file.
+            new ExactFileRule('.gitignore', $templatesDir . '/gitignore'),
 
             // Pinned to a release tag, never @main: see README "Versioning".
             new ContainsRule('.github/workflows/checks.yml', [
@@ -61,8 +46,6 @@ final readonly class StandardDefinition
             new FileExistsRule('composer-ci.json', 'CI installs the full optional dependency set'),
             new FileExistsRule('phpstan-baseline.neon', 'baseline must be explicit, not implied'),
             new FileExistsRule('deptrac.yaml', 'layer rules are mandatory'),
-            new FileExistsRule('infection.json5', 'mutation testing is part of the standard'),
-            new FileExistsRule('codecov.yml', 'coverage reporting is part of the standard'),
             new FileExistsRule('LICENSE', 'every bundle ships MIT'),
             new FileExistsRule('SECURITY.md', 'disclosure policy is mandatory'),
             new FileExistsRule('README.md', 'public documentation is mandatory'),

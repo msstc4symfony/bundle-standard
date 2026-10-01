@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: msstc4symfony/bundle-standard
-          ref: v1.6.2
+          ref: v1.7.0
           path: standard
 
       - uses: shivammathur/setup-php@v2
@@ -351,6 +351,30 @@ jobs:
           fail_ci_if_error: true
           slug: ${{ inputs.slug }}
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  minimal:
+    # Every other job installs composer-ci.json, optional libraries included. This one installs
+    # the published composer.json only: it proves the class_exists/interface_exists guards hold
+    # and that tests needing an optional library skip themselves instead of failing.
+    name: PHPUnit without optional libraries
+    runs-on: ubuntu-latest
+    env:
+      COMPOSER: composer.json
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: ${{ inputs.extensions }}
+          ini-values: ${{ inputs.ini-values }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Resolve dependencies
+        run: composer update --prefer-dist --no-progress --no-interaction
+
+      - run: vendor/bin/phpunit
 
   bc-check:
     name: BC check (Roave)

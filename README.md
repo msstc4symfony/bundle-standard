@@ -22,7 +22,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.6.2
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.7.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -47,38 +47,35 @@ Exit codes:
 | `1`  | The bundle violates the standard; every violation is printed to `STDERR` as `<file>: <message>`. |
 | `2`  | Usage error — the argument is missing or is not a directory. |
 
-The rule set applies three different verification strengths, chosen per
-file:
+The rule set applies three verification strengths, chosen per file:
 
 | Level | Files | Rule |
 |-------|-------|------|
-| Byte-for-byte match | `.php-cs-fixer.dist.php`, `phpstan-ci.neon`, `Makefile` | `ExactFileRule` |
-| Key-value check | `rector.php`, `phpstan.dist.neon`, `phpunit.xml.dist`, `composer.json` | `ContainsRule`, `ComposerManifestRule` |
-| Existence / absence | `deptrac.yaml`, `infection.json5`, `LICENSE`, `SECURITY.md`, `psalm.xml` | `FileExistsRule`, `FileAbsentRule` |
+| Byte-for-byte match | `.php-cs-fixer.dist.php`, `phpstan-ci.neon`, `phpstan.dist.neon`, `rector.php`, `Makefile`, `phpunit.xml.dist`, `infection.json5`, `codecov.yml`, `.gitignore` | `ExactFileRule` |
+| Key-value check | `.github/workflows/checks.yml`, `composer.json` | `ContainsRule`, `ComposerManifestRule` |
+| Existence / absence | `composer-ci.json`, `phpstan-baseline.neon`, `deptrac.yaml`, `LICENSE`, `SECURITY.md`, `README.md`, `CLAUDE.md`, `psalm.xml` | `FileExistsRule`, `FileAbsentRule` |
 
-Files that legitimately carry per-bundle variation — each bundle keeps its
-own Rector skip list and its own PHPStan `excludePaths` — are checked by
-key values rather than byte-for-byte; requiring an exact match there would
-forbid variation the standard is supposed to allow.
+Tool configuration is identical in every bundle. Bundle specifics live in the
+files made for them:
 
-The rule set is assembled in `src/StandardDefinition::rules()` and checks,
-among other things:
+- `deptrac.yaml` — the bundle's own layers;
+- `phpstan-baseline.neon` — accepted findings, each with a reason (e.g. a test fixture that
+  deliberately extends a class from a package that is not installed);
+- `composer.json` / `composer-ci.json` — dependencies and optional libraries;
+- `.github/workflows/checks.yml` — workflow inputs (`slug`, PHP `extensions`, `ini-values`).
 
-- `.php-cs-fixer.dist.php`, `phpstan-ci.neon`, and `Makefile` are
-  byte-identical to the templates under `templates/`.
-- `rector.php`, `phpstan.dist.neon`, and `phpunit.xml.dist` contain the
-  required settings (e.g. `level: 9`, `phpVersion: 80400`,
-  `failOnRisky="true"`), while still allowing bundle-specific additions
-  (skip lists, exclude paths).
+Every bundle therefore uses the same layout: `src/`, `tests/Unit/` and `tests/Integration/`
+(PHPUnit suites `unit` and `integration`), with `autoload-dev` mapping `<Root>\Test\` to
+`tests/`.
+
+The rule set is assembled in `src/StandardDefinition::rules()` and also checks:
+
 - `composer.json` declares no `version` field, lives under the
   `msstc4symfony` vendor, is licensed MIT, lists
   `Maxim Shamaev <maxim.shamaev@gmail.com>` among its `authors`, requires
   `php: >=8.4`, requires `symfony/yaml` when `src/` uses `YamlFileLoader`, and
   keeps its `autoload-dev` namespace under the package's own root
   namespace.
-- `composer-ci.json`, `phpstan-baseline.neon`, `deptrac.yaml`,
-  `infection.json5`, `codecov.yml`, `LICENSE`, `SECURITY.md`, `README.md`,
-  and `CLAUDE.md` are present.
 - `.github/workflows/checks.yml` calls `php-bundle.yml` pinned to a release
   tag (`@vX.Y.Z`, never `@main`).
 - `psalm.xml` and `psalm-baseline.xml` are absent — the standard uses
@@ -104,7 +101,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.6.2
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.7.0
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:
@@ -125,6 +122,10 @@ Inputs (all optional except `slug`):
 | `run-bc-check` | `true` | Run the Roave backward-compatibility check. |
 | `run-codecov` | `false` | Upload coverage and test results to Codecov; requires the `CODECOV_TOKEN` secret. |
 
+Besides the PHPUnit matrix, the workflow runs `PHPUnit without optional libraries`: it installs
+the published `composer.json` only, so `class_exists` / `interface_exists` guards and
+self-skipping integration tests are verified in every bundle.
+
 A consumer bundle does **not** need `bundle-standard` as a composer
 dependency: the workflow's `standard-check` job checks out this
 repository at the release tag on its own and runs the verifier against the
@@ -133,11 +134,9 @@ bundle's checkout.
 ## Templates
 
 `templates/` holds the reference files that `ExactFileRule` compares
-against byte-for-byte:
-
-- `templates/.php-cs-fixer.dist.php`
-- `templates/phpstan-ci.neon`
-- `templates/Makefile`
+against byte-for-byte: `.php-cs-fixer.dist.php`, `phpstan-ci.neon`, `phpstan.dist.neon`,
+`rector.php`, `Makefile`, `phpunit.xml.dist`, `infection.json5`, `codecov.yml` and `gitignore`
+(copied to the bundle as `.gitignore`; stored without the dot so it does not apply here).
 
 A bundle brings itself into compliance by copying these files in as-is.
 
