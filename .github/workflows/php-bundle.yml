@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: msstc4symfony/bundle-standard
-          ref: v1.5.1
+          ref: v1.6.0
           path: standard
 
       - uses: shivammathur/setup-php@v2
@@ -296,15 +296,26 @@ jobs:
       - name: Pin Symfony version
         env:
           SYMFONY_VERSION: ${{ matrix.symfony.version }}
-        # browser-kit + dom-crawler must match http-kernel's major (transitive via framework-bundle)
-        # — otherwise WebTestCase blows up loading HttpKernelBrowser with a signature mismatch fatal.
+        # Pins the kernel core plus every symfony/* package the CI manifest already lists, so no
+        # component drifts to another major. Packages outside the lockstep monorepo versioning
+        # (monolog-bundle, phpunit-bridge, flex, maker-bundle, polyfills, contracts) are left alone.
+        # dom-crawler follows browser-kit: a mismatch fatals WebTestCase's HttpKernelBrowser.
         run: |
-          composer require --no-update --no-interaction \
-            "symfony/framework-bundle:${SYMFONY_VERSION}" \
-            "symfony/console:${SYMFONY_VERSION}" \
-            "symfony/http-kernel:${SYMFONY_VERSION}" \
-            "symfony/dependency-injection:${SYMFONY_VERSION}" \
-            "symfony/config:${SYMFONY_VERSION}"
+          set -f  # keep "8.*" from being glob-expanded
+          listed=$(php -r '
+            $m = json_decode(file_get_contents(getenv("COMPOSER")), true, 512, JSON_THROW_ON_ERROR);
+            foreach (array_keys(($m["require"] ?? []) + ($m["require-dev"] ?? [])) as $p) {
+                if (preg_match("#^symfony/(?!(monolog-bundle|phpunit-bridge|flex|maker-bundle)$|polyfill-)(?!.*-contracts$)#", $p)) {
+                    echo $p, PHP_EOL;
+                }
+                if ($p === "symfony/browser-kit") {
+                    echo "symfony/dom-crawler", PHP_EOL;
+                }
+            }')
+          packages=$(printf '%s\n' symfony/framework-bundle symfony/console symfony/http-kernel \
+            symfony/dependency-injection symfony/config ${listed} | sort -u)
+          echo "Pinning to ${SYMFONY_VERSION}:" ${packages}
+          composer require --no-update --no-interaction $(printf '%s:'"${SYMFONY_VERSION}"' ' ${packages})
 
       - name: Resolve dependencies
         run: composer update --prefer-dist --no-progress --no-interaction
