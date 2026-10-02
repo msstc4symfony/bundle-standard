@@ -334,6 +334,103 @@ final class ComposerManifestRuleTest extends TestCase
         self::assertSame([], (new ComposerManifestRule())->check($this->bundleDir));
     }
 
+    /**
+     * @return iterable<string, array{non-empty-string, non-empty-string}>
+     */
+    public static function contractsConstraints(): iterable
+    {
+        yield 'service contracts, two majors' => ['symfony/service-contracts', '^2.5|^3'];
+        yield 'event dispatcher contracts, one major' => ['symfony/event-dispatcher-contracts', '^3.0'];
+        yield 'cache contracts, v-prefixed version' => ['symfony/cache-contracts', '^v3.0'];
+        yield 'deprecation contracts, exact version' => ['symfony/deprecation-contracts', '3.5.1'];
+        yield 'contracts meta package, tilde and double pipe' => ['symfony/contracts', '~2.5 || ^3.0'];
+        yield 'translation contracts, minor wildcard' => ['symfony/translation-contracts', '3.*'];
+    }
+
+    #[DataProvider('contractsConstraints')]
+    public function testAcceptsContractsPackagesWithTheirOwnConstraint(string $package, string $constraint): void
+    {
+        $this->writeManifest([
+            'name' => 'msstc4symfony/tracing-bundle',
+            'license' => 'MIT',
+            'authors' => [self::AUTHOR],
+            'require' => [
+                'php' => '>=8.4',
+                'symfony/framework-bundle' => '^6.4|^7.0|^8.0',
+                $package => $constraint,
+            ],
+            'conflict' => ['symfony/symfony' => '*'],
+            'extra' => ['symfony' => ['require' => '^6.4|^7.0|^8.0']],
+            'autoload' => ['psr-4' => ['MaxShamaev\\TracingBundle\\' => 'src/']],
+        ]);
+
+        self::assertSame([], $this->messages());
+    }
+
+    /**
+     * @return iterable<string, array{mixed, string}>
+     */
+    public static function unboundedContractsConstraints(): iterable
+    {
+        yield 'wildcard' => ['*', '*'];
+        yield 'empty string' => ['', ''];
+        yield 'blank string' => ['  ', '  '];
+        yield 'open-ended lower bound' => ['>=2.5', '>=2.5'];
+        yield 'one open-ended alternative' => ['^3.0|>=2', '^3.0|>=2'];
+        yield 'branch' => ['dev-main', 'dev-main'];
+        yield 'hyphen range across majors' => ['2.5 - 9.0', '2.5 - 9.0'];
+        yield 'hyphen range in one alternative' => ['^3 || 1.0 - 99', '^3 || 1.0 - 99'];
+        yield 'upper bound only' => ['<4', '<4'];
+        yield 'major wildcard' => ['3.*.*.*', '3.*.*.*'];
+        yield 'not a string' => [3, 'none'];
+    }
+
+    #[DataProvider('unboundedContractsConstraints')]
+    public function testReportsContractsPackageWithoutABoundedConstraint(mixed $constraint, string $shown): void
+    {
+        $this->writeManifest([
+            'name' => 'msstc4symfony/tracing-bundle',
+            'license' => 'MIT',
+            'authors' => [self::AUTHOR],
+            'require' => [
+                'php' => '>=8.4',
+                'symfony/framework-bundle' => '^6.4|^7.0|^8.0',
+                'symfony/service-contracts' => $constraint,
+            ],
+            'conflict' => ['symfony/symfony' => '*'],
+            'extra' => ['symfony' => ['require' => '^6.4|^7.0|^8.0']],
+            'autoload' => ['psr-4' => ['MaxShamaev\\TracingBundle\\' => 'src/']],
+        ]);
+
+        self::assertSame(
+            [sprintf('require.symfony/service-contracts must bound each alternative to one major (^, ~ or an exact version), found "%s"', $shown)],
+            $this->messages(),
+        );
+    }
+
+    public function testContractsExemptionDoesNotCoverTheirImplementations(): void
+    {
+        $this->writeManifest([
+            'name' => 'msstc4symfony/tracing-bundle',
+            'license' => 'MIT',
+            'authors' => [self::AUTHOR],
+            'require' => [
+                'php' => '>=8.4',
+                'symfony/contracts' => '^3.0',
+                'symfony/translation' => '^3.0',
+                'symfony/translation-contracts' => '^3.0',
+            ],
+            'conflict' => ['symfony/symfony' => '*'],
+            'extra' => ['symfony' => ['require' => '^6.4|^7.0|^8.0']],
+            'autoload' => ['psr-4' => ['MaxShamaev\\TracingBundle\\' => 'src/']],
+        ]);
+
+        self::assertSame(
+            ['require.symfony/translation must use constraint "^6.4|^7.0|^8.0", found "^3.0"'],
+            $this->messages(),
+        );
+    }
+
     public function testReportsMissingConflict(): void
     {
         $this->writeManifest([

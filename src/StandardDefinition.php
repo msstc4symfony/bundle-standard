@@ -9,6 +9,7 @@ use Msstc4Symfony\BundleStandard\Rule\ContainsRule;
 use Msstc4Symfony\BundleStandard\Rule\ExactFileRule;
 use Msstc4Symfony\BundleStandard\Rule\FileAbsentRule;
 use Msstc4Symfony\BundleStandard\Rule\FileExistsRule;
+use Msstc4Symfony\BundleStandard\Rule\PhpstanConfigRule;
 use Msstc4Symfony\BundleStandard\Rule\RuleInterface;
 
 final readonly class StandardDefinition
@@ -27,7 +28,7 @@ final readonly class StandardDefinition
             // phpstan-baseline.neon, composer manifests and the workflow inputs.
             new ExactFileRule('.php-cs-fixer.dist.php', $templatesDir . '/.php-cs-fixer.dist.php'),
             new ExactFileRule('phpstan-ci.neon', $templatesDir . '/phpstan-ci.neon'),
-            new ExactFileRule('phpstan.dist.neon', $templatesDir . '/phpstan.dist.neon'),
+            new PhpstanConfigRule('phpstan.dist.neon', $templatesDir . '/phpstan.dist.neon'),
             new ExactFileRule('rector.php', $templatesDir . '/rector.php'),
             new ExactFileRule('Makefile', $templatesDir . '/Makefile'),
             new ExactFileRule('phpunit.xml.dist', $templatesDir . '/phpunit.xml.dist'),

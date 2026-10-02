@@ -35,7 +35,23 @@ on:
         required: false
         type: boolean
         default: true
+      infection-min-msi:
+        description: 'Minimum Mutation Score Indicator (percent) below which Infection fails the build'
+        required: false
+        type: number
+        default: 55
+      infection-min-covered-msi:
+        description: 'Minimum MSI (percent) over mutants covered by tests below which Infection fails the build'
+        required: false
+        type: number
+        default: 55
       run-bc-check:
+        description: 'Run the blocking Roave BC check; set false only for an intentional major outside a major branch'
+        required: false
+        type: boolean
+        default: true
+      run-prefer-lowest:
+        description: 'Add a PHPUnit cell on the lowest PHP and Symfony versions with composer update --prefer-lowest'
         required: false
         type: boolean
         default: true
@@ -64,7 +80,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: msstc4symfony/bundle-standard
-          ref: v1.7.2
+          ref: v1.8.0
           path: standard
 
       - uses: shivammathur/setup-php@v2
@@ -260,13 +276,18 @@ jobs:
       - run: composer audit
 
   phpunit:
-    name: PHPUnit (PHP ${{ matrix.php }}, Symfony ${{ matrix.symfony.version }})
+    # Existing cells keep their check names; only the extra cell gets a suffix.
+    name: PHPUnit (PHP ${{ matrix.php }}, Symfony ${{ matrix.symfony.version }}${{ matrix.dependencies == 'lowest' && ', lowest dependencies' || '' }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         php: ${{ fromJSON(inputs.php-versions) }}
         symfony: ${{ fromJSON(inputs.symfony-versions) }}
+        dependencies: [highest]
+        # One extra cell on the first (lowest) PHP and Symfony entries, resolved with --prefer-lowest:
+        # proves the declared lower bounds actually work.
+        include: ${{ fromJSON(inputs.run-prefer-lowest && format('[{{"php":{0},"symfony":{1},"dependencies":"lowest"}}]', toJSON(fromJSON(inputs.php-versions)[0]), toJSON(fromJSON(inputs.symfony-versions)[0])) || '[]') }}
     steps:
       - uses: actions/checkout@v5
 
@@ -281,9 +302,9 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: vendor
-          key: vendor-${{ runner.os }}-php${{ matrix.php }}-symfony${{ matrix.symfony.label }}-${{ hashFiles('composer-ci.json') }}
+          key: vendor-${{ runner.os }}-php${{ matrix.php }}-symfony${{ matrix.symfony.label }}-${{ matrix.dependencies }}-${{ hashFiles('composer-ci.json') }}
           restore-keys: |
-            vendor-${{ runner.os }}-php${{ matrix.php }}-symfony${{ matrix.symfony.label }}-
+            vendor-${{ runner.os }}-php${{ matrix.php }}-symfony${{ matrix.symfony.label }}-${{ matrix.dependencies }}-
 
       - name: Drop tools incompatible with the matrix Symfony version
         # roave/backward-compatibility-check requires symfony/console ^7.4.4 (blocks Symfony 6.4).
@@ -319,7 +340,14 @@ jobs:
           composer require --no-update --no-interaction $(printf '%s:'"${SYMFONY_VERSION}"' ' ${packages})
 
       - name: Resolve dependencies
-        run: composer update --prefer-dist --no-progress --no-interaction
+        env:
+          DEPENDENCIES: ${{ matrix.dependencies }}
+        run: |
+          if [ "${DEPENDENCIES}" = lowest ]; then
+            composer update --prefer-lowest --prefer-stable --prefer-dist --no-progress --no-interaction
+          else
+            composer update --prefer-dist --no-progress --no-interaction
+          fi
 
       # Guards against the cell silently running another Symfony major than its label
       # (a dependency capping or lifting the version past the pins above).
@@ -335,7 +363,7 @@ jobs:
 
       - run: XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit junit.xml
 
-      - if: ${{ inputs.run-codecov && matrix.symfony.codecov && matrix.php == '8.4' && !cancelled() }}
+      - if: ${{ inputs.run-codecov && matrix.symfony.codecov && matrix.php == '8.4' && matrix.dependencies == 'highest' && !cancelled() }}
         uses: codecov/codecov-action@v6
         with:
           files: ./coverage.xml
@@ -344,7 +372,7 @@ jobs:
           slug: ${{ inputs.slug }}
           token: ${{ secrets.CODECOV_TOKEN }}
 
-      - if: ${{ inputs.run-codecov && matrix.symfony.codecov && matrix.php == '8.4' && !cancelled() }}
+      - if: ${{ inputs.run-codecov && matrix.symfony.codecov && matrix.php == '8.4' && matrix.dependencies == 'highest' && !cancelled() }}
         uses: codecov/codecov-action@v6
         with:
           report_type: test_results
@@ -382,7 +410,6 @@ jobs:
     needs: setup
     if: inputs.run-bc-check
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
         with:
@@ -405,10 +432,32 @@ jobs:
       # Classes that implement optional-library interfaces only reflect when those libraries
       # are installed, so use the CI manifest with dev dependencies whenever the base tag has
       # one; older tags predate composer-ci.json and fall back to composer.json.
+      # HEAD is compared with the latest stable tag. Breaking changes are expected only while a new
+      # major is prepared: on (or in a pull request into) a branch named after a higher major than
+      # that tag (2.x, 2.0, release/2.0), or once a pre-release of a higher major (v2.0.0-rc1) is the
+      # nearest tag. Everywhere else a BC break fails the build.
       - name: Roave BC check
         run: |
-          if ! base=$(git describe --tags --abbrev=0 2>/dev/null); then
-            echo "No release tag yet: nothing to compare against."
+          # A pushed release tag is compared with the stable tag before it, not with itself.
+          head=HEAD
+          if [ "${GITHUB_REF_TYPE:-}" = tag ]; then
+            head=HEAD^
+          fi
+          if ! base=$(git describe --tags --abbrev=0 --exclude='*-*' "${head}" 2>/dev/null); then
+            echo "No stable release tag yet: nothing to compare against."
+            exit 0
+          fi
+          base_major="${base#v}"
+          base_major="${base_major%%.*}"
+          latest=$(git describe --tags --abbrev=0)
+          target="${GITHUB_BASE_REF:-${GITHUB_REF_NAME:-}}"
+          # Each =~ overwrites BASH_REMATCH, so every test reads it right after its own match.
+          if [[ "${latest}" =~ ^v?([0-9]+)(\.[0-9]+){0,2}- ]] && (( BASH_REMATCH[1] > base_major )); then
+            echo "::notice::${latest} is a pre-release of a new major after ${base}: BC check skipped."
+            exit 0
+          fi
+          if [[ "${target}" =~ ^(release/)?v?([0-9]+)\.([0-9]+|x)$ ]] && (( BASH_REMATCH[2] > base_major )); then
+            echo "::notice::${target} prepares major ${BASH_REMATCH[2]} after ${base}: BC check skipped."
             exit 0
           fi
           if git cat-file -e "${base}:composer-ci.json" 2>/dev/null; then
@@ -424,7 +473,6 @@ jobs:
     needs: setup
     if: ${{ inputs.run-infection && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
 
@@ -441,7 +489,10 @@ jobs:
           path: vendor
           key: ${{ needs.setup.outputs.vendor-cache-key }}
 
-      - run: XDEBUG_MODE=coverage vendor/bin/infection --threads=$(nproc) --no-interaction --logger-github
+      - run: >-
+          XDEBUG_MODE=coverage vendor/bin/infection --threads=$(nproc) --no-interaction --logger-github
+          --min-msi=${{ inputs.infection-min-msi }} --min-covered-msi=${{ inputs.infection-min-covered-msi }}
+          --ignore-msi-with-no-mutations
 
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v6

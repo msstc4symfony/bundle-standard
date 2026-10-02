@@ -12,8 +12,9 @@ specific settings, and which must not exist at all. It ships two things:
 2. **A reusable GitHub Actions workflow**
    (`.github/workflows/php-bundle.yml`) that runs the verifier plus the
    full quality gate (lint, PHPStan, PHP-CS-Fixer, Rector, DEPTRAC,
-   `composer audit`, the PHPUnit matrix, an optional Roave BC check, and
-   optional Infection mutation testing) for any bundle that calls it.
+   `composer audit`, the PHPUnit matrix with a `--prefer-lowest` cell, the
+   Roave BC check and Infection mutation testing with a minimum MSI) for any
+   bundle that calls it. Every job is blocking.
 
 ## Versioning
 
@@ -22,7 +23,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.7.2
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.8.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -51,7 +52,8 @@ The rule set applies three verification strengths, chosen per file:
 
 | Level | Files | Rule |
 |-------|-------|------|
-| Byte-for-byte match | `.php-cs-fixer.dist.php`, `phpstan-ci.neon`, `phpstan.dist.neon`, `rector.php`, `Makefile`, `phpunit.xml.dist`, `infection.json5`, `codecov.yml`, `.gitignore` | `ExactFileRule` |
+| Byte-for-byte match | `.php-cs-fixer.dist.php`, `phpstan-ci.neon`, `rector.php`, `Makefile`, `phpunit.xml.dist`, `infection.json5`, `codecov.yml`, `.gitignore` | `ExactFileRule` |
+| Byte-for-byte match except the `level:` line, which must be `9`, `10` or `max` | `phpstan.dist.neon` | `PhpstanConfigRule` |
 | Key-value check | `.github/workflows/checks.yml`, `composer.json` | `ContainsRule`, `ComposerManifestRule` |
 | Existence / absence | `composer-ci.json`, `phpstan-baseline.neon`, `deptrac.yaml`, `LICENSE`, `SECURITY.md`, `README.md`, `CLAUDE.md`, `psalm.xml` | `FileExistsRule`, `FileAbsentRule` |
 
@@ -76,6 +78,13 @@ The rule set is assembled in `src/StandardDefinition::rules()` and also checks:
   `php: >=8.4`, requires `symfony/yaml` when `src/` uses `YamlFileLoader`, and
   keeps its `autoload-dev` namespace under the package's own root
   namespace.
+- every `symfony/*` entry in `require` uses `^6.4|^7.0|^8.0`, except
+  `symfony/monolog-bundle` and the contracts packages (`symfony/contracts`,
+  `symfony/*-contracts`): these follow their own major line, so they may use any
+  constraint whose every alternative stays within one major (`^2.5|^3`, `~3.0`,
+  `3.5.1`, `3.*`); `*`, `>=2`, `<4`, hyphen ranges (`2.5 - 9`), AND forms (`>=3.1 <4`),
+  stability flags (`^3@dev`) and `dev-main` are rejected.
+- `phpstan.dist.neon` declares `level: 9`, `level: 10` or `level: max`.
 - `.github/workflows/checks.yml` calls `php-bundle.yml` pinned to a release
   tag (`@vX.Y.Z`, never `@main`).
 - `psalm.xml` and `psalm-baseline.xml` are absent — the standard uses
@@ -101,7 +110,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.7.2
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.8.0
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:
@@ -119,12 +128,44 @@ Inputs (all optional except `slug`):
 | `ini-values` | `''` | `php.ini` overrides for jobs running bundle code, e.g. `apc.enable_cli=1`. |
 | `run-deptrac` | `true` | Run the DEPTRAC layer-rules job. |
 | `run-infection` | `true` | Run Infection mutation testing (push to `main` only). |
-| `run-bc-check` | `true` | Run the Roave backward-compatibility check. |
+| `infection-min-msi` | `55` | Minimum Mutation Score Indicator, in percent; Infection fails the build below it. |
+| `infection-min-covered-msi` | `55` | Minimum MSI over the mutants covered by tests, in percent. |
+| `run-bc-check` | `true` | Run the Roave backward-compatibility check (blocking, see below). |
+| `run-prefer-lowest` | `true` | Add the `--prefer-lowest` PHPUnit cell (see below). |
 | `run-codecov` | `false` | Upload coverage and test results to Codecov; requires the `CODECOV_TOKEN` secret. |
 
 Besides the PHPUnit matrix, the workflow runs `PHPUnit without optional libraries`: it installs
 the published `composer.json` only, so `class_exists` / `interface_exists` guards and
 self-skipping integration tests are verified in every bundle.
+
+**Prefer-lowest cell.** One extra PHPUnit cell runs on the first entry of `php-versions` and the
+first entry of `symfony-versions` (keep both lists ordered lowest first) and resolves the CI
+manifest with `composer update --prefer-lowest --prefer-stable`, so the lower bounds a bundle
+declares are actually tested. A bundle whose lower bounds do not work yet sets
+`run-prefer-lowest: false` until it raises them.
+
+**Infection threshold.** Infection fails the build when the MSI or the covered-code MSI drops below
+`infection-min-msi` / `infection-min-covered-msi`. The defaults (55 / 55) sit a few points below the
+weakest bundle when they were introduced (metrics-bundle, 59 %); a bundle with a better score should
+raise its own inputs rather than wait for the default to move. A bundle without mutants passes.
+Infection runs on pushes to `main` only, so a pull request that lowers the score turns `main` red
+after the merge; run `make infection` locally before merging changes to `src/`.
+
+**BC check and new majors.** The Roave check compares `HEAD` with the latest stable tag (pre-release
+tags are not a baseline) and fails the build on any backward-incompatible change. It is skipped, with
+a notice, only while a new major is being prepared:
+
+- the pushed branch, or the target branch of a pull request, is named exactly after a major above the
+  latest stable tag's: `2.x`, `2.0`, `release/2.0` or `v2.0` while that tag is `v1.*`
+  (`2.x-feature` or `3.5-hotfix` do not count);
+- the nearest tag is a pre-release of such a major (`v2.0.0-rc1` after `v1.3.0`).
+
+So a 2.0 release-candidate branch (`2.x`) runs without the check until `v2.0.0` is tagged. To merge
+that branch back into `main`, tag the first pre-release (`v2.0.0-rc1`) on it before opening the pull
+request; without that tag the merge is compared with `v1.*` and fails. A pre-release of a minor
+(`v1.4.0-beta1`) does not switch the check off. A pushed release tag is compared with the stable tag before it. For an intentional major prepared directly on
+`main`, set `run-bc-check: false` in that bundle's `checks.yml` for the release and restore it right
+after the tag.
 
 A consumer bundle does **not** need `bundle-standard` as a composer
 dependency: the workflow's `standard-check` job checks out this
@@ -133,8 +174,8 @@ bundle's checkout.
 
 ## Templates
 
-`templates/` holds the reference files that `ExactFileRule` compares
-against byte-for-byte: `.php-cs-fixer.dist.php`, `phpstan-ci.neon`, `phpstan.dist.neon`,
+`templates/` holds the reference files that `ExactFileRule` (and, level line aside,
+`PhpstanConfigRule`) compares against byte-for-byte: `.php-cs-fixer.dist.php`, `phpstan-ci.neon`, `phpstan.dist.neon`,
 `rector.php`, `Makefile`, `phpunit.xml.dist`, `infection.json5`, `codecov.yml` and `gitignore`
 (copied to the bundle as `.gitignore`; stored without the dot so it does not apply here).
 

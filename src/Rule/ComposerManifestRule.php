@@ -35,6 +35,16 @@ final readonly class ComposerManifestRule implements RuleInterface
      */
     private const array NON_LOCKSTEP_SYMFONY_PACKAGES = ['symfony/monolog-bundle'];
 
+    /**
+     * Contracts follow their own major line (^2, ^3) independent of the components.
+     */
+    private const string CONTRACTS_PACKAGE_PATTERN = '#^symfony/([a-z0-9-]+-)?contracts$#';
+
+    /**
+     * One alternative of a constraint that cannot leave a single major: ^3, ~3.1, 3.4.1, 3.*, 3.4.*.
+     */
+    private const string SINGLE_MAJOR_ALTERNATIVE = '/^(?:[\^~]v?\d+(?:\.\d+){0,2}|v?\d+(?:\.\d+){0,2}|v?\d+(?:\.\d+)?\.\*)$/';
+
     #[Override]
     public function check(string $bundlePath): array
     {
@@ -250,6 +260,15 @@ final readonly class ComposerManifestRule implements RuleInterface
                 continue;
             }
 
+            if (preg_match(self::CONTRACTS_PACKAGE_PATTERN, $package) === 1) {
+                $violations = [
+                    ...$violations,
+                    ...$this->checkContractsConstraint($package, is_string($constraint) ? $constraint : null),
+                ];
+
+                continue;
+            }
+
             if ($constraint === self::SYMFONY_CONSTRAINT) {
                 continue;
             }
@@ -266,6 +285,42 @@ final readonly class ComposerManifestRule implements RuleInterface
         }
 
         return $violations;
+    }
+
+    /**
+     * @return list<Violation>
+     */
+    private function checkContractsConstraint(string $package, ?string $constraint): array
+    {
+        if ($constraint !== null && $this->boundsEveryAlternative($constraint)) {
+            return [];
+        }
+
+        return [new Violation(
+            self::FILE,
+            sprintf(
+                'require.%s must bound each alternative to one major (^, ~ or an exact version), found "%s"',
+                $package,
+                $constraint ?? 'none',
+            ),
+        )];
+    }
+
+    private function boundsEveryAlternative(string $constraint): bool
+    {
+        $alternatives = preg_split('/\s*\|\|?\s*/', trim($constraint));
+
+        if ($alternatives === false) {
+            return false;
+        }
+
+        foreach ($alternatives as $alternative) {
+            if (preg_match(self::SINGLE_MAJOR_ALTERNATIVE, $alternative) !== 1) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

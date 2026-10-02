@@ -47,6 +47,26 @@ final class StandardDefinitionTest extends TestCase
         }
     }
 
+    public function testAcceptsAStricterPhpstanLevelThanTheTemplate(): void
+    {
+        $bundleDir = sys_get_temp_dir() . '/level-bundle-' . uniqid('', true);
+        mkdir($bundleDir);
+        $template = file_get_contents(self::TEMPLATES_DIR . '/phpstan.dist.neon');
+        self::assertIsString($template);
+        file_put_contents($bundleDir . '/phpstan.dist.neon', preg_replace('/^(\s*level:\s*)\S+$/m', '${1}10', $template));
+
+        try {
+            $violations = (new Verifier(StandardDefinition::rules(self::TEMPLATES_DIR)))->verify($bundleDir);
+
+            $files = array_map(static fn (Violation $v): string => $v->file, $violations);
+
+            self::assertNotContains('phpstan.dist.neon', $files);
+        } finally {
+            unlink($bundleDir . '/phpstan.dist.neon');
+            rmdir($bundleDir);
+        }
+    }
+
     public function testAcceptsTheReferenceBundle(): void
     {
         $reference = __DIR__ . '/../../../logger-bundle';
