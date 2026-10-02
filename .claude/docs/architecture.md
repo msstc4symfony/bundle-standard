@@ -94,7 +94,7 @@ interface RuleInterface
 вносится только здесь; `bin/verify-standard.php` и тесты на сам
 верификатор его не дублируют.
 
-## Reusable workflow `php-bundle.yml` (v1.8.0)
+## Reusable workflow `php-bundle.yml` (v1.8.1)
 
 - Все джобы блокирующие: `continue-on-error` запрещён
   (`ReusableWorkflowTest`).
@@ -130,3 +130,30 @@ interface RuleInterface
   `symfony/error-handler` — виноват другой нижний транзитивный пакет
   (кандидаты: monolog-bundle 3.11 / monolog-bridge / var-dumper 6.3), нужен
   разбор по бандлу.
+
+## Шаблон `rector.php`: Symfony-правила по нижней версии (с v1.8.1)
+
+- Rector 2.6.x больше не имеет `SymfonySetList::SYMFONY_64` и прочих
+  версионных сетов: все Symfony-правила живут в одном
+  `withComposerBased(symfony: true)`, каждое привязано к пакету и версии
+  (`rector composer-based` показывает таблицу «Requires / Installed / Active»).
+- Для `type != project` Rector сам берёт нижнюю границу constraint, но только
+  у пакетов из `require`/`require-dev`. Транзитивные Symfony-пакеты
+  (http-foundation, console, security-core…) резолвились в версию из
+  vendor/ (8.x) — так `PushRequestToRequestStackConstructorRector` (7.2)
+  переписал тесты logger-bundle на `new RequestStack([$r])`, а
+  `Application::add → addCommand` (7.4) мог тихо попасть в src/.
+- Шаблон теперь возвращает замыкание: биндит в контейнер Rector
+  singleton `InstalledPackageResolver(__DIR__, <tmp>.json)`. Tmp-манифест
+  (`tempnam(sys_get_temp_dir(), 'rector-lowest-packages-')`, свой на процесс,
+  удаляется в shutdown) перечисляет все установленные пакеты в `require`:
+  lockstep Symfony-пакеты (`symfony/*` с версией ≥ 6.4.0 или `dev-*`;
+  contracts, polyfills, monolog-bundle ниже порога и не трогаются) прижаты к
+  `6.4.0`, прямые зависимости — их объявленный constraint (Rector берёт нижнюю
+  границу), остальные — установленная версия. Тот же резолвер использует
+  `ComposerPackageConstraintFilter` и команда `composer-based`.
+- Порог `$lowestSymfony = '6.4.0'` в шаблоне дублирует нижнюю границу
+  `ComposerManifestRule::SYMFONY_CONSTRAINT`; расхождение ловит
+  `RectorTemplateTest`.
+- Проверка: `vendor/bin/rector composer-based | grep symfony/ | grep -E '>=(7|8)'`
+  не должна содержать `yes`.
