@@ -1,0 +1,523 @@
+name: PHP bundle standard
+
+on:
+  workflow_call:
+    inputs:
+      slug:
+        description: 'owner/repo slug, used for Codecov uploads'
+        required: true
+        type: string
+      php-versions:
+        description: 'JSON array of PHP versions for the test matrix'
+        required: false
+        type: string
+        default: '["8.4","8.5"]'
+      symfony-versions:
+        description: 'JSON array of {version,label,codecov} objects'
+        required: false
+        type: string
+        default: '[{"version":"7.4.*","label":"7.4","codecov":false},{"version":"8.*","label":"8","codecov":true}]'
+      extensions:
+        description: 'PHP extensions required by the bundle test suite'
+        required: false
+        type: string
+        default: 'mbstring, xml, ctype, iconv, intl'
+      ini-values:
+        description: 'php.ini overrides for jobs that run the bundle code, e.g. "apc.enable_cli=1"'
+        required: false
+        type: string
+        default: ''
+      run-deptrac:
+        required: false
+        type: boolean
+        default: true
+      run-infection:
+        required: false
+        type: boolean
+        default: true
+      infection-min-msi:
+        description: 'Minimum Mutation Score Indicator (percent) below which Infection fails the build'
+        required: false
+        type: number
+        default: 55
+      infection-min-covered-msi:
+        description: 'Minimum MSI (percent) over mutants covered by tests below which Infection fails the build'
+        required: false
+        type: number
+        default: 55
+      run-bc-check:
+        description: 'Run the blocking Roave BC check; set false only for an intentional major outside a major branch'
+        required: false
+        type: boolean
+        default: true
+      run-prefer-lowest:
+        description: 'Add a PHPUnit cell on the lowest PHP and Symfony versions with composer update --prefer-lowest'
+        required: false
+        type: boolean
+        default: true
+      run-codecov:
+        description: 'Upload coverage and test results to Codecov (needs the CODECOV_TOKEN secret)'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      CODECOV_TOKEN:
+        required: false
+
+env:
+  PRIMARY_PHP: '8.4'
+  COMPOSER: composer-ci.json
+
+jobs:
+  standard-check:
+    name: Standard compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: bundle
+
+      - uses: actions/checkout@v5
+        with:
+          repository: msstc4symfony/bundle-standard
+          ref: v1.0.0
+          path: standard
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PRIMARY_PHP }}
+          extensions: mbstring, json
+          coverage: none
+          tools: composer:v2
+
+      # bundle-standard ships only composer.json, not composer-ci.json — the top-level
+      # COMPOSER env var (meant for the bundle under test) must not leak into this install.
+      - name: Install standard verifier
+        working-directory: standard
+        env:
+          COMPOSER: composer.json
+        run: composer install --no-dev --prefer-dist --no-progress --no-interaction
+
+      - name: Verify bundle against the standard
+        run: php standard/bin/verify-standard.php bundle
+
+  setup:
+    name: Install dependencies
+    runs-on: ubuntu-latest
+    outputs:
+      vendor-cache-key: ${{ steps.cache-key.outputs.value }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PRIMARY_PHP }}
+          extensions: ${{ inputs.extensions }}
+          ini-values: ${{ inputs.ini-values }}
+          coverage: none
+          tools: composer:v2
+
+      - id: cache-key
+        # The manifest is hashed too: autoload rules live there, not in the lock.
+        run: echo "value=vendor-${{ runner.os }}-php${{ env.PRIMARY_PHP }}-${{ hashFiles('composer-ci.json', 'composer-ci.lock') }}" >> "$GITHUB_OUTPUT"
+
+      - id: vendor-cache
+        uses: actions/cache@v5
+        with:
+          path: vendor
+          key: ${{ steps.cache-key.outputs.value }}
+
+      - if: steps.vendor-cache.outputs.cache-hit != 'true'
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+  lint:
+    name: PHP lint
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PRIMARY_PHP }}
+          coverage: none
+          tools: composer:v2
+
+      - uses: actions/cache@v5
+        with:
+          path: vendor
+          key: ${{ needs.setup.outputs.vendor-cache-key }}
+
+      - run: find ./src ./tests -name '*.php' | xargs -r -P4 -n50 php -l
+
+  phpstan:
+    name: PHPStan
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PRIMARY_PHP }}
+          extensions: ${{ inputs.extensions }}
+          ini-values: ${{ inputs.ini-values }}
+          coverage: none
+          tools: composer:v2
+
+      - uses: actions/cache@v5
+        with:
+          path: vendor
+          key: ${{ needs.setup.outputs.vendor-cache-key }}
+
+      - uses: actions/cache@v5
+        with:
+          path: /tmp/phpstan
+          key: phpstan-${{ hashFiles('composer-ci.lock', 'phpstan*.neon') }}
+          restore-keys: |
+            phpstan-
+
+      - run: vendor/bin/phpstan analyse --memory-limit=512M -c phpstan-ci.neon
+
+  cs-fixer:
+    name: PHP-CS-Fixer
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PRIMARY_PHP }}
+          extensions: mbstring
+          coverage: none
+          tools: composer:v2
+
+      - uses: actions/cache@v5
+        with:
+          path: vendor
+          key: ${{ needs.setup.outputs.vendor-cache-key }}
+
+      - uses: actions/cache@v5
+        with:
+          path: .php-cs-fixer.cache
+          key: cs-fixer-${{ hashFiles('.php-cs-fixer.dist.php', 'composer-ci.lock') }}
+
+      - run: vendor/bin/php-cs-fixer check
+
+  rector:
+    name: Rector
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PRIMARY_PHP }}
+          extensions: mbstring
+          coverage: none
+          tools: composer:v2
+
+      - uses: actions/cache@v5
+        with:
+          path: vendor
+          key: ${{ needs.setup.outputs.vendor-cache-key }}
+
+      - uses: actions/cache@v5
+        with:
+          path: /tmp/rector
+          key: rector-${{ hashFiles('rector.php', 'composer-ci.lock') }}
+
+      - run: vendor/bin/rector process -n
+
+  deptrac:
+    name: DEPTRAC (layer rules)
+    needs: setup
+    if: inputs.run-deptrac
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PRIMARY_PHP }}
+          extensions: mbstring
+          coverage: none
+          tools: composer:v2
+
+      - uses: actions/cache@v5
+        with:
+          path: vendor
+          key: ${{ needs.setup.outputs.vendor-cache-key }}
+
+      - run: vendor/bin/deptrac analyse --config-file=deptrac.yaml --no-progress
+
+  composer-audit:
+    name: Composer validate + audit
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PRIMARY_PHP }}
+          coverage: none
+          tools: composer:v2
+
+      - uses: actions/cache@v5
+        with:
+          path: vendor
+          key: ${{ needs.setup.outputs.vendor-cache-key }}
+
+      - run: composer validate --strict --no-check-publish
+
+      - run: composer audit
+
+  phpunit:
+    # Existing cells keep their check names; only the extra cell gets a suffix.
+    name: PHPUnit (PHP ${{ matrix.php }}, Symfony ${{ matrix.symfony.version }}${{ matrix.dependencies == 'lowest' && ', lowest dependencies' || '' }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ${{ fromJSON(inputs.php-versions) }}
+        symfony: ${{ fromJSON(inputs.symfony-versions) }}
+        dependencies: [highest]
+        # One extra cell on the first (lowest) PHP and Symfony entries, resolved with --prefer-lowest:
+        # proves the declared lower bounds actually work.
+        include: ${{ fromJSON(inputs.run-prefer-lowest && format('[{{"php":{0},"symfony":{1},"dependencies":"lowest"}}]', toJSON(fromJSON(inputs.php-versions)[0]), toJSON(fromJSON(inputs.symfony-versions)[0])) || '[]') }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: ${{ inputs.extensions }}
+          ini-values: ${{ inputs.ini-values }}
+          coverage: xdebug
+          tools: composer:v2
+
+      - uses: actions/cache@v5
+        with:
+          path: vendor
+          key: vendor-${{ runner.os }}-php${{ matrix.php }}-symfony${{ matrix.symfony.label }}-${{ matrix.dependencies }}-${{ hashFiles('composer-ci.json') }}
+          restore-keys: |
+            vendor-${{ runner.os }}-php${{ matrix.php }}-symfony${{ matrix.symfony.label }}-${{ matrix.dependencies }}-
+
+      - name: Drop tools incompatible with the matrix Symfony version
+        # roave/backward-compatibility-check requires symfony/console ^7.4.4 (blocks Symfony 6.4).
+        # deptrac/deptrac requires symfony/console ^6.4 || ^7.4 || ^8.0 (blocks Symfony 7.0-7.3).
+        # Both are exercised in their own dedicated jobs, never under phpunit — drop before resolve.
+        run: |
+          composer remove --dev --no-update --no-interaction \
+            roave/backward-compatibility-check \
+            deptrac/deptrac || true
+
+      - name: Pin Symfony version
+        env:
+          SYMFONY_VERSION: ${{ matrix.symfony.version }}
+        # Pins the kernel core plus every symfony/* package the CI manifest already lists, so no
+        # component drifts to another major. Packages outside the lockstep monorepo versioning
+        # (monolog-bundle, phpunit-bridge, flex, maker-bundle, polyfills, contracts) are left alone.
+        # dom-crawler follows browser-kit: a mismatch fatals WebTestCase's HttpKernelBrowser.
+        run: |
+          set -f  # keep "8.*" from being glob-expanded
+          listed=$(php -r '
+            $m = json_decode(file_get_contents(getenv("COMPOSER")), true, 512, JSON_THROW_ON_ERROR);
+            foreach (array_keys(($m["require"] ?? []) + ($m["require-dev"] ?? [])) as $p) {
+                if (preg_match("#^symfony/(?!(monolog-bundle|phpunit-bridge|flex|maker-bundle)$|polyfill-)(?!.*-contracts$)#", $p)) {
+                    echo $p, PHP_EOL;
+                }
+                if ($p === "symfony/browser-kit") {
+                    echo "symfony/dom-crawler", PHP_EOL;
+                }
+            }')
+          packages=$(printf '%s\n' symfony/framework-bundle symfony/console symfony/http-kernel \
+            symfony/dependency-injection symfony/config ${listed} | sort -u)
+          echo "Pinning to ${SYMFONY_VERSION}:" ${packages}
+          composer require --no-update --no-interaction $(printf '%s:'"${SYMFONY_VERSION}"' ' ${packages})
+
+      - name: Resolve dependencies
+        env:
+          DEPENDENCIES: ${{ matrix.dependencies }}
+        run: |
+          if [ "${DEPENDENCIES}" = lowest ]; then
+            composer update --prefer-lowest --prefer-stable --prefer-dist --no-progress --no-interaction
+          else
+            composer update --prefer-dist --no-progress --no-interaction
+          fi
+
+      # Guards against the cell silently running another Symfony major than its label
+      # (a dependency capping or lifting the version past the pins above).
+      - name: Assert the matrix Symfony version was installed
+        env:
+          SYMFONY_LABEL: ${{ matrix.symfony.label }}
+        run: |
+          installed=$(composer show symfony/http-kernel --format=json | jq -r '.versions[0]')
+          case "$installed" in
+            "v${SYMFONY_LABEL}".*) echo "symfony/http-kernel ${installed}" ;;
+            *) echo "::error::Matrix expects Symfony ${SYMFONY_LABEL}, resolved symfony/http-kernel ${installed}: a dependency forces another Symfony major"; exit 1 ;;
+          esac
+
+      - run: XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit junit.xml
+
+      - if: ${{ inputs.run-codecov && matrix.symfony.codecov && matrix.php == '8.4' && matrix.dependencies == 'highest' && !cancelled() }}
+        uses: codecov/codecov-action@v6
+        with:
+          files: ./coverage.xml
+          flags: phpunit
+          fail_ci_if_error: true
+          slug: ${{ inputs.slug }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - if: ${{ inputs.run-codecov && matrix.symfony.codecov && matrix.php == '8.4' && matrix.dependencies == 'highest' && !cancelled() }}
+        uses: codecov/codecov-action@v6
+        with:
+          report_type: test_results
+          flags: phpunit
+          fail_ci_if_error: true
+          slug: ${{ inputs.slug }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  minimal:
+    # Every other job installs composer-ci.json, optional libraries included. This one installs
+    # the published composer.json only: it proves the class_exists/interface_exists guards hold
+    # and that tests needing an optional library skip themselves instead of failing. It runs on
+    # the PHP of the package's runtime profile, so a php74-profile package is tested on PHP 7.4 here.
+    name: PHPUnit without optional libraries
+    runs-on: ubuntu-latest
+    env:
+      COMPOSER: composer.json
+    steps:
+      - uses: actions/checkout@v5
+
+      # The PHP the package must run on, from its runtime profile (src/RuntimeProfile.php::minimalPhp()).
+      - id: runtime
+        name: Read the runtime profile
+        run: |
+          profile=$(jq -r '.extra["bundle-standard"].runtime // "php84"' composer.json)
+          case "${profile}" in
+            php74) php=7.4 ;;
+            php84) php=8.4 ;;
+            *) php=8.4 ;;
+          esac
+          echo "Runtime profile ${profile}: PHP ${php}"
+          echo "php=${php}" >> "$GITHUB_OUTPUT"
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ steps.runtime.outputs.php }}
+          extensions: ${{ inputs.extensions }}
+          ini-values: ${{ inputs.ini-values }}
+          coverage: none
+          tools: composer:v2
+
+      # On an older-PHP package this is the only job on its floor: every source must parse there.
+      # php -l checks one file per call before PHP 8.3, hence -n1.
+      - name: Lint sources with this PHP
+        if: steps.runtime.outputs.php != env.PRIMARY_PHP
+        run: find ./src ./tests -name '*.php' | xargs -r -P4 -n1 php -l
+
+      - name: Resolve dependencies
+        run: composer update --prefer-dist --no-progress --no-interaction
+
+      - run: vendor/bin/phpunit
+
+  bc-check:
+    name: BC check (Roave)
+    needs: setup
+    if: inputs.run-bc-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Roave BC check needs git history + tags
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PRIMARY_PHP }}
+          # Classes implementing extension interfaces only reflect with the extension loaded.
+          extensions: ${{ inputs.extensions }}
+          coverage: none
+          tools: composer:v2
+
+      - uses: actions/cache@v5
+        with:
+          path: vendor
+          key: ${{ needs.setup.outputs.vendor-cache-key }}
+
+      # BC-check installs deps for both `from` (latest tag) and `to` (HEAD) in temp dirs.
+      # Classes that implement optional-library interfaces only reflect when those libraries
+      # are installed, so use the CI manifest with dev dependencies whenever the base tag has
+      # one; older tags predate composer-ci.json and fall back to composer.json.
+      # HEAD is compared with the latest stable tag. Breaking changes are expected only while a new
+      # major is prepared: on (or in a pull request into) a branch named after a higher major than
+      # that tag (2.x, 2.0, release/2.0), or once a pre-release of a higher major (v2.0.0-rc1) is the
+      # nearest tag. Everywhere else a BC break fails the build.
+      - name: Roave BC check
+        run: |
+          # A pushed release tag is compared with the stable tag before it, not with itself.
+          head=HEAD
+          if [ "${GITHUB_REF_TYPE:-}" = tag ]; then
+            head=HEAD^
+          fi
+          if ! base=$(git describe --tags --abbrev=0 --exclude='*-*' "${head}" 2>/dev/null); then
+            echo "No stable release tag yet: nothing to compare against."
+            exit 0
+          fi
+          base_major="${base#v}"
+          base_major="${base_major%%.*}"
+          latest=$(git describe --tags --abbrev=0)
+          target="${GITHUB_BASE_REF:-${GITHUB_REF_NAME:-}}"
+          # Each =~ overwrites BASH_REMATCH, so every test reads it right after its own match.
+          if [[ "${latest}" =~ ^v?([0-9]+)(\.[0-9]+){0,2}- ]] && (( BASH_REMATCH[1] > base_major )); then
+            echo "::notice::${latest} is a pre-release of a new major after ${base}: BC check skipped."
+            exit 0
+          fi
+          if [[ "${target}" =~ ^(release/)?v?([0-9]+)\.([0-9]+|x)$ ]] && (( BASH_REMATCH[2] > base_major )); then
+            echo "::notice::${target} prepares major ${BASH_REMATCH[2]} after ${base}: BC check skipped."
+            exit 0
+          fi
+          if git cat-file -e "${base}:composer-ci.json" 2>/dev/null; then
+            export COMPOSER=composer-ci.json
+          else
+            export COMPOSER=composer.json
+          fi
+          echo "Comparing against ${base} using ${COMPOSER}"
+          vendor/bin/roave-backward-compatibility-check --from="${base}" --install-development-dependencies --format=github-actions --no-interaction
+
+  infection:
+    name: Infection (mutation testing)
+    needs: setup
+    if: ${{ inputs.run-infection && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PRIMARY_PHP }}
+          extensions: ${{ inputs.extensions }}
+          ini-values: ${{ inputs.ini-values }}
+          coverage: xdebug
+          tools: composer:v2
+
+      - uses: actions/cache@v5
+        with:
+          path: vendor
+          key: ${{ needs.setup.outputs.vendor-cache-key }}
+
+      - run: >-
+          XDEBUG_MODE=coverage vendor/bin/infection --threads=$(nproc) --no-interaction --logger-github
+          --min-msi=${{ inputs.infection-min-msi }} --min-covered-msi=${{ inputs.infection-min-covered-msi }}
+          --ignore-msi-with-no-mutations
+
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: infection-report
+          path: var/infection/
+          if-no-files-found: ignore
+          retention-days: 14

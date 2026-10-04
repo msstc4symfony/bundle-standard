@@ -1,0 +1,47 @@
+{
+  "name": "msstc4symfony/bundle-standard",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Maxim Shamaev",
+      "email": "maxim.shamaev@gmail.com"
+    }
+  ],
+  "type": "library",
+  "description": "Shared quality standard for msstc4symfony Symfony bundles",
+  "minimum-stability": "stable",
+  "keywords": ["php", "symfony", "standard", "ci"],
+  "prefer-stable": true,
+  "autoload": {
+    "psr-4": {
+      "Msstc4Symfony\\BundleStandard\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Msstc4Symfony\\BundleStandard\\Test\\Unit\\": "tests/unit/"
+    }
+  },
+  "require": {
+    "php": ">=8.4",
+    "ext-json": "*"
+  },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^3.55",
+    "phpstan/extension-installer": "^1.4",
+    "phpstan/phpstan": "^2.1",
+    "phpstan/phpstan-strict-rules": "^2.0",
+    "phpunit/phpunit": ">=10.5",
+    "roave/security-advisories": "dev-latest",
+    "symfony/yaml": "^7.4|^8.0"
+  },
+  "bin": [
+    "bin/verify-standard.php"
+  ],
+  "config": {
+    "allow-plugins": {
+      "phpstan/extension-installer": true
+    },
+    "sort-packages": true
+  }
+}
