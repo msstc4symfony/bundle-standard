@@ -132,6 +132,12 @@ interface RuleInterface
   первом элементе `php-versions` и `symfony-versions`, `composer update
   --prefer-lowest --prefer-stable`. Имена остальных ячеек не меняются
   (required checks). Отключается `run-prefer-lowest: false`.
+- Elasticsearch (с `v1.1.0`): вход `elasticsearch` — JSON `list<{elastica, image}>`, по умолчанию `[]`.
+  Job `elasticsearch` (`if: inputs.elasticsearch != '[]'`) — матрица по списку на `PRIMARY_PHP`:
+  сервис ES из `matrix.target.image` (single-node, security off, порт 9200), из `composer-ci.json`
+  убираются `roave/backward-compatibility-check` и `deptrac/deptrac` (они ограничивают зависимости),
+  затем `composer require --dev ruflin/elastica:<constraint>`, `vendor/bin/phpunit --group elasticsearch`
+  с `ELASTICSEARCH_URL=http://localhost:9200`. Бандлы без входа job не затрагивает (пропускается).
 - `standard-check` чекаутит bundle-standard по `ref:`, равному тегу релиза;
   README-примеры обязаны совпадать (`ReusableWorkflowTest`).
 - Prefer-lowest падает у всех шести бандлов. У profiling/tracing/bridge риск «Test code or tested

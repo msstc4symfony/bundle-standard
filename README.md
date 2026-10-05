@@ -23,7 +23,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.0.0
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.1.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -141,7 +141,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.0.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.1.0
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:
@@ -163,11 +163,25 @@ Inputs (all optional except `slug`):
 | `infection-min-covered-msi` | `55` | Minimum MSI over the mutants covered by tests, in percent. |
 | `run-bc-check` | `true` | Run the Roave backward-compatibility check (blocking, see below). |
 | `run-prefer-lowest` | `true` | Add the `--prefer-lowest` PHPUnit cell (see below). |
+| `elasticsearch` | `[]` | JSON array of `{elastica,image}`; adds an Elasticsearch integration job per entry (see below). `[]` or an empty string skips it. |
 | `run-codecov` | `false` | Upload coverage and test results to Codecov; requires the `CODECOV_TOKEN` secret. |
 
 Besides the PHPUnit matrix, the workflow runs `PHPUnit without optional libraries`: it installs
 the published `composer.json` only, so `class_exists` / `interface_exists` guards and
 self-skipping integration tests are verified in every bundle.
+
+**Elasticsearch integration.** A bundle with live-cluster tests (PHPUnit group `elasticsearch`) sets
+the `elasticsearch` input to a JSON list; one job runs per entry on the primary PHP, starts the
+entry's `image` as a service on port 9200 (single node, security off) and installs the entry's
+`elastica` constraint over the CI manifest before running `vendor/bin/phpunit --group elasticsearch`
+with `ELASTICSEARCH_URL=http://localhost:9200`. The tests must skip themselves when that variable is
+unset. With the default `[]` (or an empty string) the job is skipped and nothing else changes.
+
+```yaml
+with:
+  slug: msstc4symfony/metrics-bundle
+  elasticsearch: '[{"elastica":"^7.3","image":"docker.elastic.co/elasticsearch/elasticsearch:7.17.29"},{"elastica":"^8.0","image":"docker.elastic.co/elasticsearch/elasticsearch:8.19.22"}]'
+```
 
 **Prefer-lowest cell.** One extra PHPUnit cell runs on the first entry of `php-versions` and the
 first entry of `symfony-versions` (keep both lists ordered lowest first) and resolves the CI

@@ -57,6 +57,25 @@ final class ReusableWorkflowTest extends TestCase
         }
     }
 
+    public function testElasticsearchInputDefaultsToAnEmptyList(): void
+    {
+        self::assertSame('string', self::workflowValue('on', 'workflow_call', 'inputs', 'elasticsearch', 'type'));
+        self::assertSame('[]', self::workflowValue('on', 'workflow_call', 'inputs', 'elasticsearch', 'default'));
+    }
+
+    public function testElasticsearchJobRunsOnlyForANonEmptyListAndUsesTheMatrixImageAndElastica(): void
+    {
+        self::assertSame("inputs.elasticsearch != '[]' && inputs.elasticsearch != ''", self::workflowValue('jobs', 'elasticsearch', 'if'));
+        self::assertSame(
+            '${{ fromJSON((inputs.elasticsearch == \'[]\' || inputs.elasticsearch == \'\') && \'[{"elastica":"","image":""}]\' || inputs.elasticsearch) }}',
+            self::workflowValue('jobs', 'elasticsearch', 'strategy', 'matrix', 'target'),
+        );
+        self::assertStringNotContainsString('--with-all-dependencies', self::workflowStepRun('elasticsearch', 'ruflin/elastica'));
+        self::assertSame('${{ matrix.target.image }}', self::workflowValue('jobs', 'elasticsearch', 'services', 'elasticsearch', 'image'));
+        self::assertStringContainsString('"ruflin/elastica:${ELASTICA}"', self::workflowStepRun('elasticsearch', 'ruflin/elastica'));
+        self::assertStringContainsString('vendor/bin/phpunit --group elasticsearch', self::workflowStepRun('elasticsearch', '--group elasticsearch'));
+    }
+
     public function testInfectionFailsBelowTheConfiguredMinimumMsi(): void
     {
         foreach (['infection-min-msi', 'infection-min-covered-msi'] as $name) {

@@ -60,6 +60,11 @@ on:
         required: false
         type: boolean
         default: false
+      elasticsearch:
+        description: 'JSON array of {elastica,image}: Elastica constraint and Elasticsearch image for the integration job ("[]" or empty skips it)'
+        required: false
+        type: string
+        default: '[]'
     secrets:
       CODECOV_TOKEN:
         required: false
@@ -80,7 +85,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: msstc4symfony/bundle-standard
-          ref: v1.0.0
+          ref: v1.1.0
           path: standard
 
       - uses: shivammathur/setup-php@v2
@@ -380,6 +385,47 @@ jobs:
           fail_ci_if_error: true
           slug: ${{ inputs.slug }}
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  elasticsearch:
+    name: Elasticsearch integration (Elastica ${{ matrix.target.elastica }})
+    if: inputs.elasticsearch != '[]' && inputs.elasticsearch != ''
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # A never-empty vector: GitHub rejects an empty matrix before the job-level `if` can skip it.
+        target: ${{ fromJSON((inputs.elasticsearch == '[]' || inputs.elasticsearch == '') && '[{"elastica":"","image":""}]' || inputs.elasticsearch) }}
+    services:
+      elasticsearch:
+        image: ${{ matrix.target.image }}
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: 'false'
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -fs http://localhost:9200/_cluster/health?wait_for_status=yellow"
+          --health-interval 10s --health-timeout 5s --health-retries 30
+    env:
+      ELASTICSEARCH_URL: http://localhost:9200
+    steps:
+      - uses: actions/checkout@v5
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PRIMARY_PHP }}
+          extensions: ${{ inputs.extensions }}
+          ini-values: ${{ inputs.ini-values }}
+          coverage: none
+          tools: composer:v2
+      - name: Install the Elastica version under test
+        env:
+          ELASTICA: ${{ matrix.target.elastica }}
+        run: |
+          composer remove --dev --no-update --no-interaction roave/backward-compatibility-check deptrac/deptrac || true
+          composer require --dev --no-update --no-interaction "ruflin/elastica:${ELASTICA}"
+          composer update --prefer-dist --no-progress --no-interaction
+      - run: vendor/bin/phpunit --group elasticsearch
 
   minimal:
     # Every other job installs composer-ci.json, optional libraries included. This one installs
