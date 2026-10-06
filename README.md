@@ -129,6 +129,7 @@ A consumer bundle's own workflow becomes a thin wrapper:
 name: Checks
 
 on:
+  workflow_dispatch:
   pull_request:
     paths-ignore: ['**/*.md', LICENSE]
   push:
@@ -147,6 +148,9 @@ jobs:
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 ```
+
+`workflow_dispatch` lets you run the checks by hand (`gh workflow run checks.yml --ref main`): a push that only touches Markdown, or a force-push, does not trigger them.
+
 
 Inputs (all optional except `slug`):
 
