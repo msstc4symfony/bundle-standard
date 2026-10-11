@@ -90,6 +90,12 @@ The rule set is assembled in `src/StandardDefinition::rules()` and also checks:
 - `psalm.xml` and `psalm-baseline.xml` are absent — the standard uses
   PHPStan only.
 
+## Starting a new bundle
+
+Create the repository from the [`skeleton-bundle`](https://github.com/msstc4symfony/skeleton-bundle)
+template and run `php bin/init <Name> "<description>"`: the result already complies with this standard
+and passes `php-bundle.yml`.
+
 ## Runtime profiles
 
 A package declares the PHP it must run on in `composer.json`:
