@@ -100,6 +100,8 @@ final class ReusableWorkflowTest extends TestCase
 
         self::assertSame(['7.4', '8'], array_column($cells, 'label'));
         self::assertSame([false, true], array_column($cells, 'codecov'));
+        // Each Symfony line's own PHP floor: the matrix job skips the cells below it.
+        self::assertSame(['8.2', '8.4'], array_column($cells, 'php'));
         self::assertStringNotContainsString('6.4', $default);
     }
 
@@ -108,17 +110,46 @@ final class ReusableWorkflowTest extends TestCase
         self::assertSame('boolean', self::workflowValue('on', 'workflow_call', 'inputs', 'run-prefer-lowest', 'type'));
         self::assertTrue(self::workflowValue('on', 'workflow_call', 'inputs', 'run-prefer-lowest', 'default'));
 
-        self::assertSame(['highest'], self::workflowValue('jobs', 'phpunit', 'strategy', 'matrix', 'dependencies'));
-
-        $include = self::workflowValue('jobs', 'phpunit', 'strategy', 'matrix', 'include');
-
-        self::assertIsString($include);
-        self::assertStringContainsString('inputs.run-prefer-lowest', $include);
-        self::assertStringContainsString('"dependencies":"lowest"', $include);
-        self::assertStringContainsString('fromJSON(inputs.php-versions)[0]', $include);
-        self::assertStringContainsString('fromJSON(inputs.symfony-versions)[0]', $include);
-
         self::assertStringContainsString('--prefer-lowest', self::workflowStepRun('phpunit', 'composer update'));
+    }
+
+    public function testDefaultPhpMatrixCoversPhp82To85(): void
+    {
+        self::assertSame('["8.2","8.3","8.4","8.5"]', self::workflowValue('on', 'workflow_call', 'inputs', 'php-versions', 'default'));
+    }
+
+    public function testPhpunitCellsComeFromTheMatrixJob(): void
+    {
+        self::assertSame(['matrix'], (array) self::workflowValue('jobs', 'phpunit', 'needs'));
+        self::assertSame(
+            ['include' => '${{ fromJSON(needs.matrix.outputs.include) }}'],
+            self::workflowValue('jobs', 'phpunit', 'strategy', 'matrix'),
+        );
+
+        $env = null;
+        foreach (self::workflowMap('jobs', 'matrix', 'steps') as $step) {
+            if (is_array($step) && ($step['id'] ?? null) === 'cells') {
+                $env = $step['env'] ?? null;
+            }
+        }
+
+        self::assertSame(
+            [
+                'PHP_VERSIONS' => '${{ inputs.php-versions }}',
+                'SYMFONY_VERSIONS' => '${{ inputs.symfony-versions }}',
+                'PREFER_LOWEST' => '${{ inputs.run-prefer-lowest }}',
+                'RUN_CODECOV' => '${{ inputs.run-codecov }}',
+            ],
+            $env,
+        );
+    }
+
+    public function testPhpunitCellsDropToolsThatNeedANewerPhp(): void
+    {
+        $drop = self::workflowStepRun('phpunit', 'roave/backward-compatibility-check');
+
+        self::assertStringContainsString('infection/infection', $drop);
+        self::assertStringContainsString('deptrac/deptrac', $drop);
     }
 
     public function testMinimalJobRunsOnThePhpOfTheDeclaredRuntimeProfile(): void
@@ -140,7 +171,7 @@ final class ReusableWorkflowTest extends TestCase
         self::assertIsArray($runtime);
         $script = $runtime['run'] ?? null;
         self::assertIsString($script);
-        self::assertStringContainsString('.extra["bundle-standard"].runtime // "php84"', $script);
+        self::assertStringContainsString('.extra["bundle-standard"].runtime // "php82"', $script);
         foreach (RuntimeProfile::cases() as $profile) {
             self::assertStringContainsString(sprintf('%s) php=%s ;;', $profile->value, $profile->minimalPhp()), $script);
         }

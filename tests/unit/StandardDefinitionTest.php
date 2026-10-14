@@ -82,14 +82,14 @@ final class StandardDefinitionTest extends TestCase
 
         try {
             $php74 = $this->files((new Verifier(StandardDefinition::rules(self::TEMPLATES_DIR, RuntimeProfile::Php74)))->verify($bundleDir));
-            $php84 = $this->files((new Verifier(StandardDefinition::rules(self::TEMPLATES_DIR)))->verify($bundleDir));
+            $default = $this->files((new Verifier(StandardDefinition::rules(self::TEMPLATES_DIR)))->verify($bundleDir));
 
             foreach (['phpstan.dist.neon', '.php-cs-fixer.dist.php', 'rector.php', 'phpunit.xml.dist', 'Makefile'] as $file) {
                 self::assertNotContains($file, $php74, $file);
             }
 
             foreach (['phpstan.dist.neon', '.php-cs-fixer.dist.php', 'rector.php', 'phpunit.xml.dist'] as $file) {
-                self::assertContains($file, $php84, $file);
+                self::assertContains($file, $default, $file);
             }
 
             // The workflow reads the profile from composer.json itself: checks.yml needs nothing extra.
@@ -105,6 +105,32 @@ final class StandardDefinitionTest extends TestCase
         }
     }
 
+    public function testComparesAPhp84BundleWithItsOwnTemplates(): void
+    {
+        $files = ['phpstan.dist.neon', '.php-cs-fixer.dist.php', 'rector.php'];
+        $bundleDir = sys_get_temp_dir() . '/php84-bundle-' . uniqid('', true);
+        mkdir($bundleDir);
+        foreach ($files as $file) {
+            copy(self::TEMPLATES_DIR . '/php84/' . $file, $bundleDir . '/' . $file);
+        }
+
+        try {
+            $php84 = $this->files((new Verifier(StandardDefinition::rules(self::TEMPLATES_DIR, RuntimeProfile::Php84)))->verify($bundleDir));
+            $default = $this->files((new Verifier(StandardDefinition::rules(self::TEMPLATES_DIR)))->verify($bundleDir));
+
+            foreach ($files as $file) {
+                self::assertNotContains($file, $php84, $file);
+                self::assertContains($file, $default, $file);
+            }
+        } finally {
+            foreach ($files as $file) {
+                unlink($bundleDir . '/' . $file);
+            }
+
+            rmdir($bundleDir);
+        }
+    }
+
     public function testReportsAnUnknownRuntimeProfile(): void
     {
         $bundleDir = sys_get_temp_dir() . '/unknown-profile-' . uniqid('', true);
@@ -114,7 +140,7 @@ final class StandardDefinitionTest extends TestCase
         try {
             $messages = array_map(static fn (Violation $v): string => $v->format(), (new Verifier(StandardDefinition::rules(self::TEMPLATES_DIR)))->verify($bundleDir));
 
-            self::assertContains('composer.json: extra.bundle-standard.runtime must be "php84" or "php74", found "php80"', $messages);
+            self::assertContains('composer.json: extra.bundle-standard.runtime must be "php82" or "php84" or "php74", found "php80"', $messages);
         } finally {
             unlink($bundleDir . '/composer.json');
             rmdir($bundleDir);
@@ -139,7 +165,8 @@ final class StandardDefinitionTest extends TestCase
             self::markTestSkipped('logger-bundle checkout is not available next to bundle-standard');
         }
 
-        $violations = (new Verifier(StandardDefinition::rules(self::TEMPLATES_DIR)))->verify($reference);
+        $profile = RuntimeProfile::declaredBy($reference) ?? RuntimeProfile::Php82;
+        $violations = (new Verifier(StandardDefinition::rules(self::TEMPLATES_DIR, $profile)))->verify($reference);
 
         self::assertSame(
             [],

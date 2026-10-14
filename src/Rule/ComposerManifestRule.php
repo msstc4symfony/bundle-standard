@@ -42,7 +42,7 @@ final readonly class ComposerManifestRule implements RuleInterface
      */
     private const string SINGLE_MAJOR_ALTERNATIVE = '/^(?:[\^~]v?\d+(?:\.\d+){0,2}|v?\d+(?:\.\d+){0,2}|v?\d+(?:\.\d+)?\.\*)$/';
 
-    public function __construct(private RuntimeProfile $profile = RuntimeProfile::Php84)
+    public function __construct(private RuntimeProfile $profile = RuntimeProfile::Php82)
     {
     }
 

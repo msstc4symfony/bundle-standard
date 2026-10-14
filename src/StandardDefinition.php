@@ -20,7 +20,7 @@ final readonly class StandardDefinition
      *
      * @return list<RuleInterface>
      */
-    public static function rules(string $templatesDir, RuntimeProfile $profile = RuntimeProfile::Php84): array
+    public static function rules(string $templatesDir, RuntimeProfile $profile = RuntimeProfile::Php82): array
     {
         $templatesDir = rtrim($templatesDir, '/');
         if ($templatesDir === '') {

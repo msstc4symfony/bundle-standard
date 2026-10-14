@@ -5,16 +5,18 @@ declare(strict_types=1);
 namespace Msstc4Symfony\BundleStandard;
 
 /**
- * The PHP a package must run on. Bundles run on 8.4; a package that runs inside another tool on older PHP
- * (the DTO generator's Symfony bridge, PHP 7.4) declares extra.bundle-standard.runtime: "php74".
+ * The PHP a package must run on. Bundles run on 8.2; a package that needs 8.4 declares
+ * extra.bundle-standard.runtime: "php84", one that runs inside another tool on older PHP (the DTO generator's
+ * Symfony bridge, PHP 7.4) declares "php74".
  */
 enum RuntimeProfile: string
 {
+    case Php82 = 'php82';
     case Php84 = 'php84';
     case Php74 = 'php74';
 
     /**
-     * The profile the bundle declares, Php84 when it declares none, null for a value the standard does not know.
+     * The profile the bundle declares, Php82 when it declares none, null for a value the standard does not know.
      * An unreadable composer.json counts as no declaration: ComposerManifestRule reports it.
      */
     public static function declaredBy(string $bundlePath): ?self
@@ -22,7 +24,7 @@ enum RuntimeProfile: string
         $declared = self::rawDeclaration($bundlePath);
 
         if ($declared === null) {
-            return self::Php84;
+            return self::Php82;
         }
 
         return is_string($declared) ? self::tryFrom($declared) : null;
@@ -44,6 +46,7 @@ enum RuntimeProfile: string
     public function phpConstraint(): string
     {
         return match ($this) {
+            self::Php82 => '>=8.2',
             self::Php84 => '>=8.4',
             self::Php74 => '>=7.4',
         };
@@ -57,7 +60,7 @@ enum RuntimeProfile: string
     public function symfonyConstraint(): string
     {
         return match ($this) {
-            self::Php84 => '^7.4|^8.0',
+            self::Php82, self::Php84 => '^7.4|^8.0',
             self::Php74 => '^5.4|^6.4|^7.0|^8.0',
         };
     }
@@ -68,6 +71,7 @@ enum RuntimeProfile: string
     public function minimalPhp(): string
     {
         return match ($this) {
+            self::Php82 => '8.2',
             self::Php84 => '8.4',
             self::Php74 => '7.4',
         };
@@ -85,7 +89,7 @@ enum RuntimeProfile: string
     {
         $own = $templatesDir . '/' . $this->value . '/' . $file;
 
-        return $this !== self::Php84 && is_file($own) ? $own : $templatesDir . '/' . $file;
+        return is_file($own) ? $own : $templatesDir . '/' . $file;
     }
 
     /**

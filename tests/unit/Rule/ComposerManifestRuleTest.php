@@ -79,7 +79,7 @@ final class ComposerManifestRuleTest extends TestCase
             'name' => 'msstc4symfony/logger-bundle',
             'license' => 'MIT',
             'authors' => [self::AUTHOR],
-            'require' => ['php' => '>=8.4', 'symfony/framework-bundle' => '^7.4|^8.0'],
+            'require' => ['php' => '>=8.2', 'symfony/framework-bundle' => '^7.4|^8.0'],
             'conflict' => ['symfony/symfony' => '*'],
             'extra' => ['symfony' => ['require' => '^7.4|^8.0']],
             'autoload' => ['psr-4' => ['MaxShamaev\\LoggerBundle\\' => 'src/']],
@@ -103,7 +103,7 @@ final class ComposerManifestRuleTest extends TestCase
 
         self::assertSame([], (new ComposerManifestRule(RuntimeProfile::Php74))->check($this->bundleDir));
         self::assertSame(
-            ['must require php ">=8.4", found ">=7.4"', 'require.symfony/validator must use constraint "^7.4|^8.0", found "^5.4|^6.4|^7.0|^8.0"'],
+            ['must require php ">=8.2", found ">=7.4"', 'require.symfony/validator must use constraint "^7.4|^8.0", found "^5.4|^6.4|^7.0|^8.0"'],
             array_map(static fn (Violation $v): string => $v->message, (new ComposerManifestRule())->check($this->bundleDir)),
         );
     }
@@ -114,7 +114,7 @@ final class ComposerManifestRuleTest extends TestCase
             'name' => 'msstc4symfony/logger-bundle',
             'version' => '1.0.1',
             'license' => 'MIT',
-            'require' => ['php' => '>=8.4'],
+            'require' => ['php' => '>=8.2'],
             'autoload' => ['psr-4' => ['MaxShamaev\\LoggerBundle\\' => 'src/']],
         ]);
 
@@ -131,7 +131,7 @@ final class ComposerManifestRuleTest extends TestCase
         $this->writeManifest([
             'name' => 'msstc4symfony/logger-bundle',
             'license' => 'MIT',
-            'require' => ['php' => '>=8.4'],
+            'require' => ['php' => '>=8.2'],
             'autoload' => ['psr-4' => ['MaxShamaev\\LoggerBundle\\' => 'src/']],
             'autoload-dev' => ['psr-4' => ['MaxShamaev\\HealthCheckBundle\\Test\\Unit\\' => 'tests/unit/']],
         ]);
@@ -163,14 +163,14 @@ final class ComposerManifestRuleTest extends TestCase
 
         self::assertContains('must be licensed MIT, found "proprietary"', $messages);
         self::assertContains('must live under the "msstc4symfony" vendor, found "hot-ecosystem"', $messages);
-        self::assertContains('must require php ">=8.4", found ">=8.1"', $messages);
+        self::assertContains('must require php ">=8.2", found ">=8.1"', $messages);
     }
 
     public function testReportsMissingNameField(): void
     {
         $this->writeManifest([
             'license' => 'MIT',
-            'require' => ['php' => '>=8.4'],
+            'require' => ['php' => '>=8.2'],
             'autoload' => ['psr-4' => ['MaxShamaev\\LoggerBundle\\' => 'src/']],
         ]);
 
@@ -186,7 +186,7 @@ final class ComposerManifestRuleTest extends TestCase
     {
         $this->writeManifest([
             'name' => 'msstc4symfony/logger-bundle',
-            'require' => ['php' => '>=8.4'],
+            'require' => ['php' => '>=8.2'],
             'autoload' => ['psr-4' => ['MaxShamaev\\LoggerBundle\\' => 'src/']],
         ]);
 
@@ -235,7 +235,7 @@ final class ComposerManifestRuleTest extends TestCase
 
     public function testReportsYamlLoaderWithoutSymfonyYaml(): void
     {
-        $this->writeManifest(['name' => 'msstc4symfony/foo-bundle', 'require' => ['php' => '>=8.4']]);
+        $this->writeManifest(['name' => 'msstc4symfony/foo-bundle', 'require' => ['php' => '>=8.2']]);
         $this->writeExtension('new YamlFileLoader($container, $locator);');
 
         self::assertContains(
@@ -248,7 +248,7 @@ final class ComposerManifestRuleTest extends TestCase
     {
         $this->writeManifest([
             'name' => 'msstc4symfony/foo-bundle',
-            'require' => ['php' => '>=8.4', 'symfony/yaml' => '^7.4|^8.0'],
+            'require' => ['php' => '>=8.2', 'symfony/yaml' => '^7.4|^8.0'],
         ]);
         $this->writeExtension('new YamlFileLoader($container, $locator);');
 
@@ -260,7 +260,7 @@ final class ComposerManifestRuleTest extends TestCase
 
     public function testIgnoresBundlesWithoutYamlLoader(): void
     {
-        $this->writeManifest(['name' => 'msstc4symfony/foo-bundle', 'require' => ['php' => '>=8.4']]);
+        $this->writeManifest(['name' => 'msstc4symfony/foo-bundle', 'require' => ['php' => '>=8.2']]);
         $this->writeExtension('new PhpFileLoader($container, $locator);');
 
         self::assertNotContains(
@@ -283,7 +283,7 @@ final class ComposerManifestRuleTest extends TestCase
             (new ComposerManifestRule())->check($this->bundleDir),
         );
 
-        self::assertContains('must require php ">=8.4", found "none"', $messages);
+        self::assertContains('must require php ">=8.2", found "none"', $messages);
     }
 
     public function testReportsMissingAutoloadRootNamespace(): void
@@ -291,7 +291,7 @@ final class ComposerManifestRuleTest extends TestCase
         $this->writeManifest([
             'name' => 'msstc4symfony/logger-bundle',
             'license' => 'MIT',
-            'require' => ['php' => '>=8.4'],
+            'require' => ['php' => '>=8.2'],
         ]);
 
         $messages = array_map(
@@ -318,7 +318,7 @@ final class ComposerManifestRuleTest extends TestCase
         $this->writeManifest([
             'name' => 'msstc4symfony/tracing-bundle',
             'license' => 'MIT',
-            'require' => ['php' => '>=8.4', 'symfony/framework-bundle' => '^7.2'],
+            'require' => ['php' => '>=8.2', 'symfony/framework-bundle' => '^7.2'],
             'conflict' => ['symfony/symfony' => '*'],
             'extra' => ['symfony' => ['require' => '^7.4|^8.0']],
             'autoload' => ['psr-4' => ['MaxShamaev\\TracingBundle\\' => 'src/']],
@@ -335,12 +335,12 @@ final class ComposerManifestRuleTest extends TestCase
         );
     }
 
-    public function testReportsTheSymfony64FloorUnderThePhp84Profile(): void
+    public function testReportsTheSymfony64FloorUnderTheDefaultProfile(): void
     {
         $this->writeManifest([
             'name' => 'msstc4symfony/tracing-bundle',
             'license' => 'MIT',
-            'require' => ['php' => '>=8.4', 'symfony/framework-bundle' => '^6.4|^7.0|^8.0'],
+            'require' => ['php' => '>=8.2', 'symfony/framework-bundle' => '^6.4|^7.0|^8.0'],
             'conflict' => ['symfony/symfony' => '*'],
             'extra' => ['symfony' => ['require' => '^7.4|^8.0']],
             'autoload' => ['psr-4' => ['MaxShamaev\\TracingBundle\\' => 'src/']],
@@ -364,7 +364,7 @@ final class ComposerManifestRuleTest extends TestCase
             'license' => 'MIT',
             'authors' => [self::AUTHOR],
             'require' => [
-                'php' => '>=8.4',
+                'php' => '>=8.2',
                 'symfony/framework-bundle' => '^7.4|^8.0',
                 'symfony/monolog-bundle' => '^3.0',
             ],
@@ -397,7 +397,7 @@ final class ComposerManifestRuleTest extends TestCase
             'license' => 'MIT',
             'authors' => [self::AUTHOR],
             'require' => [
-                'php' => '>=8.4',
+                'php' => '>=8.2',
                 'symfony/framework-bundle' => '^7.4|^8.0',
                 $package => $constraint,
             ],
@@ -435,7 +435,7 @@ final class ComposerManifestRuleTest extends TestCase
             'license' => 'MIT',
             'authors' => [self::AUTHOR],
             'require' => [
-                'php' => '>=8.4',
+                'php' => '>=8.2',
                 'symfony/framework-bundle' => '^7.4|^8.0',
                 'symfony/service-contracts' => $constraint,
             ],
@@ -457,7 +457,7 @@ final class ComposerManifestRuleTest extends TestCase
             'license' => 'MIT',
             'authors' => [self::AUTHOR],
             'require' => [
-                'php' => '>=8.4',
+                'php' => '>=8.2',
                 'symfony/contracts' => '^3.0',
                 'symfony/translation' => '^3.0',
                 'symfony/translation-contracts' => '^3.0',
@@ -478,7 +478,7 @@ final class ComposerManifestRuleTest extends TestCase
         $this->writeManifest([
             'name' => 'msstc4symfony/tracing-bundle',
             'license' => 'MIT',
-            'require' => ['php' => '>=8.4', 'symfony/framework-bundle' => '^7.4|^8.0'],
+            'require' => ['php' => '>=8.2', 'symfony/framework-bundle' => '^7.4|^8.0'],
             'extra' => ['symfony' => ['require' => '^7.4|^8.0']],
             'autoload' => ['psr-4' => ['MaxShamaev\\TracingBundle\\' => 'src/']],
         ]);
@@ -496,7 +496,7 @@ final class ComposerManifestRuleTest extends TestCase
         $this->writeManifest([
             'name' => 'msstc4symfony/tracing-bundle',
             'license' => 'MIT',
-            'require' => ['php' => '>=8.4', 'symfony/framework-bundle' => '^7.4|^8.0'],
+            'require' => ['php' => '>=8.2', 'symfony/framework-bundle' => '^7.4|^8.0'],
             'conflict' => ['symfony/symfony' => '*'],
             'autoload' => ['psr-4' => ['MaxShamaev\\TracingBundle\\' => 'src/']],
         ]);

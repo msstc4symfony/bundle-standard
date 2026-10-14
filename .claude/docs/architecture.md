@@ -52,10 +52,10 @@ interface RuleInterface
   и metrics-bridge-profiling).
 - `ComposerManifestRule` — точечные проверки `composer.json`: нет поля
   `version`, вендор `msstc4symfony`, лицензия `MIT`, `require.php`
-  строго `>=8.4`, `autoload-dev.psr-4` не содержит чужих неймспейсов
+  строго по профилю (`>=8.2` по умолчанию), `autoload-dev.psr-4` не содержит чужих неймспейсов
   (защита от copy-paste, когда в новый бандл случайно попадает
   тестовый неймспейс другого бандла). Каждый `symfony/*` в `require` —
-  `^7.4|^8.0` (php84; нижняя граница Symfony 7.4), кроме `symfony/monolog-bundle` и contracts
+  `^7.4|^8.0` (php82/php84; нижняя граница Symfony 7.4), кроме `symfony/monolog-bundle` и contracts
   (`symfony/contracts`, `symfony/*-contracts`): у них своя линейка мажоров,
   поэтому допустим любой constraint, где каждая альтернатива привязана к
   одному мажору (`^3`, `~3.1`, `3.5.1`, `3.*`, допускается префикс `v`;
@@ -96,13 +96,13 @@ interface RuleInterface
 
 ## Профили среды выполнения
 
-- `composer.json` → `extra.bundle-standard.runtime`: `php84` (по умолчанию) или `php74`. `RuntimeProfile::declaredBy()` читает его через `ComposerManifest::read()`; нет файла/ключа/битый JSON → `php84` (битый JSON сообщает `ComposerManifestRule`), неизвестное значение → `null`, его сообщает `RuntimeProfileRule` (значение — JSON из `declaration()`). `bin/verify-standard.php` при неизвестном профиле проверяет остальное по `php84` (`VerifyStandardCliTest`).
-- `StandardDefinition::rules($templatesDir, $profile)`: шаблон из `templates/<profile>/`, если он там есть (`RuntimeProfile::template()`), иначе общий. У `php74` свои `phpstan.dist.neon` (70400), `.php-cs-fixer.dist.php` (без запятой после параметров), `rector.php` (`withPhpVersion(PHP_74)`, `php74`-сет, без `withAttributesSets`, `$lowestSymfony = '5.4.0'`), `phpunit.xml.dist` (PHPUnit 9.6). `Php74TemplatesTest` сравнивает их с общими точными заменами — расхождение общего шаблона с копией валит тест.
-- `ComposerManifestRule($profile)`: `require.php` и ограничение `symfony/*` из профиля (`php74` — `^5.4|^6.4|^7.0|^8.0`, Symfony 6.4 требует PHP 8.1). `php84` — `^7.4|^8.0`. `RectorTemplateTest` сверяет нижнюю версию Symfony каждого Rector-шаблона с ограничением профиля.
+- `composer.json` → `extra.bundle-standard.runtime`: `php82` (по умолчанию, с v2.0.0), `php84` или `php74`. `RuntimeProfile::declaredBy()` читает его через `ComposerManifest::read()`; нет файла/ключа/битый JSON → `php82` (битый JSON сообщает `ComposerManifestRule`), неизвестное значение → `null`, его сообщает `RuntimeProfileRule` (значение — JSON из `declaration()`). `bin/verify-standard.php` при неизвестном профиле проверяет остальное по `php82` (`VerifyStandardCliTest`).
+- `StandardDefinition::rules($templatesDir, $profile)`: шаблон из `templates/<profile>/`, если он там есть (`RuntimeProfile::template()`), иначе общий (для всех профилей одинаково). Общие шаблоны — профиль `php82`: phpstan `phpVersion: {min: 80200, max: 80599}`, rector `withPhpVersion(PHP_82)` + `withPhpSets(php82: true)`, cs-fixer `new_expression_parentheses: use_parentheses`. У `php84` свои три шаблона — общие с прежними значениями (`80400`, `php84`-сет, без `new_expression_parentheses`); `Php84TemplatesTest` сверяет точными заменами. У `php74` свои `phpstan.dist.neon` (70400), `.php-cs-fixer.dist.php` (без запятой после параметров), `rector.php` (`withPhpVersion(PHP_74)`, `php74`-сет, без `withAttributesSets`, `$lowestSymfony = '5.4.0'`), `phpunit.xml.dist` (PHPUnit 9.6). `Php74TemplatesTest` сравнивает их с общими точными заменами — расхождение общего шаблона с копией валит тест.
+- `ComposerManifestRule($profile)`: `require.php` и ограничение `symfony/*` из профиля (`php74` — `^5.4|^6.4|^7.0|^8.0`, Symfony 6.4 требует PHP 8.1). `php82`/`php84` — `^7.4|^8.0`. `RectorTemplateTest` сверяет нижнюю версию Symfony каждого Rector-шаблона с ограничением профиля.
 - Workflow: задание `minimal` (только `composer.json`) само читает профиль (`jq`, шаг `runtime`) и берёт PHP из таблицы, совпадающей с `RuntimeProfile::minimalPhp()` (`ReusableWorkflowTest` сверяет). При PHP ≠ `PRIMARY_PHP` там же `php -l` по одному файлу: до PHP 8.3 `php -l` проверяет только первый аргумент. Входа `minimal-php` нет — источник один.
 - PHPUnit 9.6 не отличает свои deprecations от чужих: `convertDeprecationsToExceptions` валит сборку и на deprecation зависимости (осознанно, описано в README).
 - Первый пользователь — `msstc4symfony/dto-generator-bridge` (работает в рантайме генератора DTO, PHP ≥ 7.4); ему хватает одной записи `symfony-versions`.
-- Порядок релиза: слияние в `main` → тег на коммит, где `ref:` равен тегу → пуш тега → пуш пакетов, ссылающихся на этот тег. Матрица CI по умолчанию для `php84`: Symfony 7.4 / 8, coverage на 8.
+- Порядок релиза: слияние в `main` → тег на коммит, где `ref:` равен тегу → пуш тега → пуш пакетов, ссылающихся на этот тег. Матрица CI по умолчанию: PHP 8.2–8.5 × Symfony 7.4 / 8 (Symfony 8 только с PHP 8.4, поле `php` в `symfony-versions`), coverage на 8.4 × 8. Пакеты переходят на v2.0.0 только вместе с миграцией на PHP 8.2: verify-standard v2 у пакета с `>=8.4` без `runtime: php84` упадёт.
 
 ## Reusable workflow `php-bundle.yml`
 
@@ -127,11 +127,15 @@ interface RuleInterface
   без apcu/memcache/memcached/rdkafka, поэтому CI не ниже): metrics 59.07, healthcheck 76.54,
   logger 82.46, profiling 86.60, tracing 94.59, bridge 97.67. Infection по
   умолчанию не учитывает непокрытые мутанты, поэтому MSI == covered MSI.
-- Prefer-lowest: доп. ячейка матрицы `phpunit` через динамический
-  `include` (`format()` с `{{`/`}}` как экранированием фигурных скобок) на
-  первом элементе `php-versions` и `symfony-versions`, `composer update
-  --prefer-lowest --prefer-stable`. Имена остальных ячеек не меняются
-  (required checks). Отключается `run-prefer-lowest: false`.
+- Матрица PHPUnit (с v2.0.0): job `matrix` (sparse checkout `composer.json`) строит `include` через `jq` —
+  все пары PHP × Symfony, кроме тех, где PHP ниже PHP профиля (та же таблица, что в `minimal`) или ниже поля
+  `php` записи Symfony (сравнение массивов чисел; `tostring`, так что `[8.4]` без кавычек работает;
+  нечисловое `nightly` → 999, выше всех), плюс ячейка prefer-lowest = первая оставшаяся пара
+  (`composer update --prefer-lowest --prefer-stable`). Неизвестный профиль (и в `minimal`) или пустой результат → `::error::` и exit 1; `run-codecov` без ячейки PRIMARY_PHP × codecov → `::warning::` (GitHub
+  иначе падает на пустой матрице без объяснения). Скрипт исполняется в `PhpunitMatrixTest` (нужен `jq`). `phpunit`
+  берёт только `include: fromJSON(needs.matrix.outputs.include)`. Имена ячеек не изменились (required
+  checks). Отключается `run-prefer-lowest: false`. Ячейки удаляют из `composer-ci.json` roave BC,
+  deptrac и Infection (0.32 требует PHP 8.3) — те работают в своих job на 8.4.
 - Elasticsearch (с `v1.1.0`): вход `elasticsearch` — JSON `list<{elastica, image}>`, по умолчанию `[]`.
   Job `elasticsearch` (`if: inputs.elasticsearch != '[]'`) — матрица по списку на `PRIMARY_PHP`:
   сервис ES из `matrix.target.image` (single-node, security off, порт 9200), из `composer-ci.json`

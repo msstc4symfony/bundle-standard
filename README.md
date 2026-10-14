@@ -18,12 +18,12 @@ specific settings, and which must not exist at all. It ships two things:
 
 ## Versioning
 
-Releases are three-part semver tags (`v1.0.0`, `v1.1.0`, …). Consumer bundles
+Releases are three-part semver tags (`v1.0.0`, `v2.0.0`, …). Consumer bundles
 pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.1.0
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v2.0.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -75,7 +75,7 @@ The rule set is assembled in `src/StandardDefinition::rules()` and also checks:
 - `composer.json` declares no `version` field, lives under the
   `msstc4symfony` vendor, is licensed MIT, lists
   `Maxim Shamaev <maxim.shamaev@gmail.com>` among its `authors`, requires
-  `php: >=8.4` (`>=7.4` under the `php74` runtime profile), requires `symfony/yaml` when `src/` uses `YamlFileLoader`, and
+  `php: >=8.2` (`>=8.4` under the `php84` runtime profile, `>=7.4` under `php74`), requires `symfony/yaml` when `src/` uses `YamlFileLoader`, and
   keeps its `autoload-dev` namespace under the package's own root
   namespace.
 - every `symfony/*` entry in `require` uses `^7.4|^8.0`, except
@@ -101,13 +101,21 @@ and passes `php-bundle.yml`.
 A package declares the PHP it must run on in `composer.json`:
 
 ```json
-"extra": {"bundle-standard": {"runtime": "php74"}}
+"extra": {"bundle-standard": {"runtime": "php84"}}
 ```
 
 | Profile | Default | `require.php` | `symfony/*` constraint | Templates |
 |---------|---------|---------------|------------------------|-----------|
-| `php84` | yes | `>=8.4` | `^7.4\|^8.0` | `templates/` |
+| `php82` | yes | `>=8.2` | `^7.4\|^8.0` | `templates/` |
+| `php84` | no | `>=8.4` | `^7.4\|^8.0` | `templates/php84/` where present, else `templates/` |
 | `php74` | no | `>=7.4` | `^5.4\|^6.4\|^7.0\|^8.0` | `templates/php74/` where present, else `templates/` |
+
+The shared templates keep the code on PHP 8.2: `phpstan.dist.neon` analyses for PHP 8.2–8.5
+(`phpVersion: {min: 80200, max: 80599}`), `rector.php` applies the PHP 8.2 sets under `withPhpVersion(PHP_82)`,
+and `.php-cs-fixer.dist.php` keeps the parentheses around `new` expressions (the `new_expression_parentheses`
+rule needs `friendsofphp/php-cs-fixer` `^3.76` in `composer-ci.json`). `php84` is for a package that
+needs PHP 8.4: its templates are the shared ones targeting 8.4 (`phpVersion: 80400`, `withPhpSets(php84: true)`,
+no `new_expression_parentheses`).
 
 `php74` exists for packages that run inside another tool on older PHP — the Symfony bridge of the DTO
 generator runs in the generator's runtime, which supports PHP 7.4. Its templates differ only where PHP 7.4,
@@ -116,7 +124,7 @@ trailing comma after the last parameter), `rector.php` (`withPhpVersion(PHP_74)`
 floor 5.4) and `phpunit.xml.dist` (PHPUnit 9.6 schema). Any other `runtime` value is a violation.
 
 The workflow reads the profile itself: the "PHPUnit without optional libraries" job installs `composer.json`
-alone on the profile's PHP (7.4 for `php74`) and there lints every source one file at a time. Every other job
+alone on the profile's PHP (8.2, 8.4 or 7.4) and, below PHP 8.4, lints every source one file at a time. Every other job
 installs `composer-ci.json` on PHP 8.4 or the matrix versions, so a `php74` package keeps only what installs on
 PHP 7.4 in the `require-dev` of `composer.json` (PHPUnit 9.6) and the tools in `composer-ci.json`.
 
@@ -148,7 +156,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.1.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v2.0.0
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:
@@ -163,8 +171,8 @@ Inputs (all optional except `slug`):
 | Input | Default | Purpose |
 |-------|---------|---------|
 | `slug` | — (required) | `owner/repo`, passed to Codecov uploads. |
-| `php-versions` | `["8.4","8.5"]` | JSON array of PHP versions for the PHPUnit matrix. |
-| `symfony-versions` | 7.4 / 8.x, coverage on 8.x | JSON array of `{version,label,codecov}` objects. |
+| `php-versions` | `["8.2","8.3","8.4","8.5"]` | JSON array of PHP versions for the PHPUnit matrix, lowest first. |
+| `symfony-versions` | 7.4 (from PHP 8.2) / 8.x (from PHP 8.4), coverage on 8.x | JSON array of `{version,label,codecov,php?}` objects; `php` is the lowest PHP that Symfony installs on (7.4: 8.2, 8: 8.4). |
 | `extensions` | `mbstring, xml, ctype, iconv, intl` | PHP extensions installed for the bundle's test suite. |
 | `ini-values` | `''` | `php.ini` overrides for jobs running bundle code, e.g. `apc.enable_cli=1`. |
 | `run-deptrac` | `true` | Run the DEPTRAC layer-rules job. |
@@ -193,10 +201,19 @@ with:
   elasticsearch: '[{"elastica":"^7.3","image":"docker.elastic.co/elasticsearch/elasticsearch:7.17.29"},{"elastica":"^8.0","image":"docker.elastic.co/elasticsearch/elasticsearch:8.19.22"}]'
 ```
 
-**Prefer-lowest cell.** One extra PHPUnit cell runs on the first entry of `php-versions` and the
-first entry of `symfony-versions` (keep both lists ordered lowest first) and resolves the CI
-manifest with `composer update --prefer-lowest --prefer-stable`, so the lower bounds a bundle
-declares are actually tested. A bundle whose lower bounds do not work yet sets
+**PHPUnit matrix.** The `matrix` job pairs every `php-versions` entry with every `symfony-versions` entry
+and drops the pairs below the package's runtime profile (a `php84` package gets no PHP 8.2/8.3 cell) or below
+the Symfony entry's `php`: set it to the lowest PHP that Symfony line installs on (7.4 → `"8.2"`, 8 → `"8.4"`),
+so the default matrix has no Symfony 8 cell on PHP 8.2 or 8.3. Give `php-versions` as strings: a JSON number
+loses trailing zeros (`8.10` reads as `8.1`). When no pair remains the job fails with an error instead of
+starting an empty matrix; with `run-codecov` on and no cell on PHP 8.4 with a `codecov` Symfony entry, it warns
+that nothing will be uploaded. Each cell removes Roave BC check, DEPTRAC and Infection from the CI manifest
+before resolving: they run in their own jobs on PHP 8.4, and Infection 0.32 does not install on PHP 8.2.
+
+**Prefer-lowest cell.** One extra PHPUnit cell runs on the first remaining pair of the matrix — the first entry
+of `php-versions` with the first entry of `symfony-versions` it can install (keep both lists ordered lowest
+first) — and resolves the CI manifest with `composer update --prefer-lowest --prefer-stable`, so the lower
+bounds a bundle declares are actually tested. A bundle whose lower bounds do not work yet sets
 `run-prefer-lowest: false` until it raises them.
 
 **Infection threshold.** Infection fails the build when the MSI or the covered-code MSI drops below

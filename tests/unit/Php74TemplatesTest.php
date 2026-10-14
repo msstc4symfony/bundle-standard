@@ -18,7 +18,7 @@ final class Php74TemplatesTest extends TestCase
     public function testPhpstanAnalysesForPhp74(): void
     {
         self::assertSame(
-            str_replace('phpVersion: 80400', 'phpVersion: 70400', $this->read('phpstan.dist.neon')),
+            str_replace("phpVersion:\n        min: 80200\n        max: 80599", 'phpVersion: 70400', $this->read('phpstan.dist.neon')),
             $this->read('php74/phpstan.dist.neon'),
         );
     }
@@ -26,7 +26,10 @@ final class Php74TemplatesTest extends TestCase
     public function testCsFixerAddsNoTrailingCommaToParameters(): void
     {
         self::assertSame(
-            str_replace("'elements' => ['arguments', 'arrays', 'match', 'parameters'],", "'elements' => ['arguments', 'arrays'],", $this->read('.php-cs-fixer.dist.php')),
+            strtr($this->read('.php-cs-fixer.dist.php'), [
+                "'elements' => ['arguments', 'arrays', 'match', 'parameters']," => "'elements' => ['arguments', 'arrays'],",
+                "        'new_expression_parentheses' => ['use_parentheses' => true],\n" => '',
+            ]),
             $this->read('php74/.php-cs-fixer.dist.php'),
         );
     }
@@ -34,10 +37,9 @@ final class Php74TemplatesTest extends TestCase
     public function testRectorKeepsTheCodeOnPhp74AndSymfony54(): void
     {
         $expected = strtr($this->read('rector.php'), [
-            "use Rector\\Config\\RectorConfig;\n" => "use Rector\\Config\\RectorConfig;\nuse Rector\\ValueObject\\PhpVersion;\n",
             "\$lowestSymfony = '7.4.0';" => "\$lowestSymfony = '5.4.0';",
             'of the standard\'s "^7.4|^8.0" constraint.' => 'of the php74 profile\'s "^5.4|^6.4|^7.0|^8.0" constraint.',
-            "        ->withPhpSets(php84: true)\n" => "        // The package runs on PHP 7.4: no rule may raise the code above it.\n        ->withPhpVersion(PhpVersion::PHP_74)\n        ->withPhpSets(php74: true)\n",
+            "        // The package runs on PHP 8.2: no rule may raise the code above it.\n        ->withPhpVersion(PhpVersion::PHP_82)\n        ->withPhpSets(php82: true)\n" => "        // The package runs on PHP 7.4: no rule may raise the code above it.\n        ->withPhpVersion(PhpVersion::PHP_74)\n        ->withPhpSets(php74: true)\n",
             "        ->withAttributesSets(symfony: true, doctrine: true, mongoDb: true, phpunit: true)\n" => '',
         ]);
 

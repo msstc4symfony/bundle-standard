@@ -33,13 +33,13 @@ final class RuntimeProfileTest extends TestCase
     }
 
     #[DataProvider('manifestsWithoutADeclaration')]
-    public function testDefaultsToPhp84WithoutADeclaration(?string $manifest): void
+    public function testDefaultsToPhp82WithoutADeclaration(?string $manifest): void
     {
         if ($manifest !== null) {
             file_put_contents($this->bundleDir . '/composer.json', $manifest);
         }
 
-        self::assertSame(RuntimeProfile::Php84, RuntimeProfile::declaredBy($this->bundleDir));
+        self::assertSame(RuntimeProfile::Php82, RuntimeProfile::declaredBy($this->bundleDir));
     }
 
     /**
@@ -63,6 +63,9 @@ final class RuntimeProfileTest extends TestCase
 
         file_put_contents($this->bundleDir . '/composer.json', '{"extra": {"bundle-standard": {"runtime": "php84"}}}');
         self::assertSame(RuntimeProfile::Php84, RuntimeProfile::declaredBy($this->bundleDir));
+
+        file_put_contents($this->bundleDir . '/composer.json', '{"extra": {"bundle-standard": {"runtime": "php82"}}}');
+        self::assertSame(RuntimeProfile::Php82, RuntimeProfile::declaredBy($this->bundleDir));
     }
 
     public function testHasNoProfileForAnUnknownDeclaration(): void
@@ -81,17 +84,22 @@ final class RuntimeProfileTest extends TestCase
 
     public function testKnowsItsPhpFloor(): void
     {
+        self::assertSame('>=8.2', RuntimeProfile::Php82->phpConstraint());
         self::assertSame('>=8.4', RuntimeProfile::Php84->phpConstraint());
         self::assertSame('>=7.4', RuntimeProfile::Php74->phpConstraint());
+        self::assertSame('8.2', RuntimeProfile::Php82->minimalPhp());
         self::assertSame('8.4', RuntimeProfile::Php84->minimalPhp());
         self::assertSame('7.4', RuntimeProfile::Php74->minimalPhp());
+        self::assertSame('^7.4|^8.0', RuntimeProfile::Php82->symfonyConstraint());
         self::assertSame('^7.4|^8.0', RuntimeProfile::Php84->symfonyConstraint());
         self::assertSame('^5.4|^6.4|^7.0|^8.0', RuntimeProfile::Php74->symfonyConstraint());
     }
 
     public function testPrefersTheProfilesOwnTemplate(): void
     {
-        self::assertSame(self::TEMPLATES_DIR . '/phpstan.dist.neon', RuntimeProfile::Php84->template(self::TEMPLATES_DIR, 'phpstan.dist.neon'));
+        self::assertSame(self::TEMPLATES_DIR . '/phpstan.dist.neon', RuntimeProfile::Php82->template(self::TEMPLATES_DIR, 'phpstan.dist.neon'));
+        self::assertSame(self::TEMPLATES_DIR . '/php84/phpstan.dist.neon', RuntimeProfile::Php84->template(self::TEMPLATES_DIR, 'phpstan.dist.neon'));
+        self::assertSame(self::TEMPLATES_DIR . '/Makefile', RuntimeProfile::Php84->template(self::TEMPLATES_DIR, 'Makefile'));
         self::assertSame(self::TEMPLATES_DIR . '/php74/phpstan.dist.neon', RuntimeProfile::Php74->template(self::TEMPLATES_DIR, 'phpstan.dist.neon'));
         self::assertSame(self::TEMPLATES_DIR . '/Makefile', RuntimeProfile::Php74->template(self::TEMPLATES_DIR, 'Makefile'));
     }

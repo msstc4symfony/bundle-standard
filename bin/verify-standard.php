@@ -32,7 +32,7 @@ if (!is_string($bundlePath) || !is_dir($bundlePath)) {
 
 $bundlePath = rtrim((string) realpath($bundlePath), '/');
 // An unknown profile is reported by RuntimeProfileRule; the rest is checked against the default one.
-$profile = RuntimeProfile::declaredBy($bundlePath) ?? RuntimeProfile::Php84;
+$profile = RuntimeProfile::declaredBy($bundlePath) ?? RuntimeProfile::Php82;
 $verifier = new Verifier(StandardDefinition::rules(__DIR__ . '/../templates', $profile));
 $violations = $verifier->verify($bundlePath);
 

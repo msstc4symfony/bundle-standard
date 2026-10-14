@@ -24,7 +24,7 @@ final class VerifyStandardCliTest extends TestCase
         }
 
         self::assertSame(1, $exitCode);
-        self::assertContains('  - composer.json: extra.bundle-standard.runtime must be "php84" or "php74", found "php80"', $output);
-        self::assertContains('  - composer.json: must require php ">=8.4", found ">=7.4"', $output);
+        self::assertContains('  - composer.json: extra.bundle-standard.runtime must be "php82" or "php84" or "php74", found "php80"', $output);
+        self::assertContains('  - composer.json: must require php ">=8.2", found ">=7.4"', $output);
     }
 }
