@@ -35,7 +35,7 @@ final readonly class ComposerManifestRule implements RuleInterface
     /**
      * Contracts (^2, ^3) and polyfills (^1) follow their own major line, independent of the components.
      */
-    private const string OWN_MAJOR_LINE_PATTERN = '#^symfony/(([a-z0-9-]+-)?contracts|polyfill-[a-z0-9-]+)$#';
+    private const string OWN_MAJOR_LINE_PATTERN = '#^symfony/(([a-z0-9-]+-)?contracts|polyfill(-[a-z0-9-]+)?)$#';
 
     /**
      * One alternative of a constraint that cannot leave a single major: ^3, ~3.1, 3.4.1, 3.*, 3.4.*.

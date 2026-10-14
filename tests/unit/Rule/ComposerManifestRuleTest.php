@@ -379,7 +379,7 @@ final class ComposerManifestRuleTest extends TestCase
     /**
      * @return iterable<string, array{non-empty-string, non-empty-string}>
      */
-    public static function contractsConstraints(): iterable
+    public static function ownMajorLineConstraints(): iterable
     {
         yield 'service contracts, two majors' => ['symfony/service-contracts', '^2.5|^3'];
         yield 'event dispatcher contracts, one major' => ['symfony/event-dispatcher-contracts', '^3.0'];
@@ -388,10 +388,11 @@ final class ComposerManifestRuleTest extends TestCase
         yield 'contracts meta package, tilde and double pipe' => ['symfony/contracts', '~2.5 || ^3.0'];
         yield 'translation contracts, minor wildcard' => ['symfony/translation-contracts', '3.*'];
         yield 'polyfill, its own 1.x line' => ['symfony/polyfill-php84', '^1.31'];
+        yield 'polyfill meta package' => ['symfony/polyfill', '^1.31'];
     }
 
-    #[DataProvider('contractsConstraints')]
-    public function testAcceptsContractsPackagesWithTheirOwnConstraint(string $package, string $constraint): void
+    #[DataProvider('ownMajorLineConstraints')]
+    public function testAcceptsOwnMajorLinePackagesWithTheirOwnConstraint(string $package, string $constraint): void
     {
         $this->writeManifest([
             'name' => 'msstc4symfony/tracing-bundle',
@@ -411,25 +412,27 @@ final class ComposerManifestRuleTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{mixed, string}>
+     * @return iterable<string, array{non-empty-string, mixed, string}>
      */
-    public static function unboundedContractsConstraints(): iterable
+    public static function unboundedOwnMajorLineConstraints(): iterable
     {
-        yield 'wildcard' => ['*', '*'];
-        yield 'empty string' => ['', ''];
-        yield 'blank string' => ['  ', '  '];
-        yield 'open-ended lower bound' => ['>=2.5', '>=2.5'];
-        yield 'one open-ended alternative' => ['^3.0|>=2', '^3.0|>=2'];
-        yield 'branch' => ['dev-main', 'dev-main'];
-        yield 'hyphen range across majors' => ['2.5 - 9.0', '2.5 - 9.0'];
-        yield 'hyphen range in one alternative' => ['^3 || 1.0 - 99', '^3 || 1.0 - 99'];
-        yield 'upper bound only' => ['<4', '<4'];
-        yield 'major wildcard' => ['3.*.*.*', '3.*.*.*'];
-        yield 'not a string' => [3, 'none'];
+        foreach (['symfony/service-contracts', 'symfony/polyfill-php84'] as $package) {
+            yield $package . ': wildcard' => [$package, '*', '*'];
+            yield $package . ': empty string' => [$package, '', ''];
+            yield $package . ': blank string' => [$package, '  ', '  '];
+            yield $package . ': open-ended lower bound' => [$package, '>=2.5', '>=2.5'];
+            yield $package . ': one open-ended alternative' => [$package, '^3.0|>=2', '^3.0|>=2'];
+            yield $package . ': branch' => [$package, 'dev-main', 'dev-main'];
+            yield $package . ': hyphen range across majors' => [$package, '2.5 - 9.0', '2.5 - 9.0'];
+            yield $package . ': hyphen range in one alternative' => [$package, '^3 || 1.0 - 99', '^3 || 1.0 - 99'];
+            yield $package . ': upper bound only' => [$package, '<4', '<4'];
+            yield $package . ': major wildcard' => [$package, '3.*.*.*', '3.*.*.*'];
+            yield $package . ': not a string' => [$package, 3, 'none'];
+        }
     }
 
-    #[DataProvider('unboundedContractsConstraints')]
-    public function testReportsContractsPackageWithoutABoundedConstraint(mixed $constraint, string $shown): void
+    #[DataProvider('unboundedOwnMajorLineConstraints')]
+    public function testReportsOwnMajorLinePackageWithoutABoundedConstraint(string $package, mixed $constraint, string $shown): void
     {
         $this->writeManifest([
             'name' => 'msstc4symfony/tracing-bundle',
@@ -438,7 +441,7 @@ final class ComposerManifestRuleTest extends TestCase
             'require' => [
                 'php' => '>=8.2',
                 'symfony/framework-bundle' => '^7.4|^8.0',
-                'symfony/service-contracts' => $constraint,
+                $package => $constraint,
             ],
             'conflict' => ['symfony/symfony' => '*'],
             'extra' => ['symfony' => ['require' => '^7.4|^8.0']],
@@ -446,12 +449,12 @@ final class ComposerManifestRuleTest extends TestCase
         ]);
 
         self::assertSame(
-            [sprintf('require.symfony/service-contracts must bound each alternative to one major (^, ~ or an exact version), found "%s"', $shown)],
+            [sprintf('require.%s must bound each alternative to one major (^, ~ or an exact version), found "%s"', $package, $shown)],
             $this->messages(),
         );
     }
 
-    public function testReportsPolyfillWithoutABoundedConstraint(): void
+    public function testPolyfillExemptionCoversOnlyThePolyfillPackages(): void
     {
         $this->writeManifest([
             'name' => 'msstc4symfony/tracing-bundle',
@@ -459,8 +462,8 @@ final class ComposerManifestRuleTest extends TestCase
             'authors' => [self::AUTHOR],
             'require' => [
                 'php' => '>=8.2',
-                'symfony/framework-bundle' => '^7.4|^8.0',
-                'symfony/polyfill-php84' => '*',
+                'symfony/polyfillx' => '^1.31',
+                'symfony/polyfill-php84' => '^1.31',
             ],
             'conflict' => ['symfony/symfony' => '*'],
             'extra' => ['symfony' => ['require' => '^7.4|^8.0']],
@@ -468,7 +471,7 @@ final class ComposerManifestRuleTest extends TestCase
         ]);
 
         self::assertSame(
-            ['require.symfony/polyfill-php84 must bound each alternative to one major (^, ~ or an exact version), found "*"'],
+            ['require.symfony/polyfillx must use constraint "^7.4|^8.0", found "^1.31"'],
             $this->messages(),
         );
     }

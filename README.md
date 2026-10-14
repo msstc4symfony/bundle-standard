@@ -80,7 +80,8 @@ The rule set is assembled in `src/StandardDefinition::rules()` and also checks:
   namespace.
 - every `symfony/*` entry in `require` uses `^7.4|^8.0`, except
   `symfony/monolog-bundle`, the contracts packages (`symfony/contracts`,
-  `symfony/*-contracts`) and the polyfills (`symfony/polyfill-*`): these follow their own major line, so they may use any
+  `symfony/*-contracts`) and the polyfills (`symfony/polyfill`,
+  `symfony/polyfill-*`): these follow their own major line, so they may use any
   constraint whose every alternative stays within one major (`^2.5|^3`, `~3.0`,
   `3.5.1`, `3.*`); `*`, `>=2`, `<4`, hyphen ranges (`2.5 - 9`), AND forms (`>=3.1 <4`),
   stability flags (`^3@dev`) and `dev-main` are rejected.

@@ -2,7 +2,7 @@
 
 ## 2.0.1 - 2026-10-14
 
-- Fixed: `symfony/polyfill-*` in `require` is checked like the contracts packages (one major per alternative,
+- Fixed: `symfony/polyfill` and `symfony/polyfill-*` in `require` is checked like the contracts packages (one major per alternative,
   e.g. `^1.31`) instead of being held to the lockstep `^7.4|^8.0`.
 
 ## 2.0.0 - 2026-10-14
