@@ -33,9 +33,9 @@ final readonly class ComposerManifestRule implements RuleInterface
     private const array NON_LOCKSTEP_SYMFONY_PACKAGES = ['symfony/monolog-bundle'];
 
     /**
-     * Contracts follow their own major line (^2, ^3) independent of the components.
+     * Contracts (^2, ^3) and polyfills (^1) follow their own major line, independent of the components.
      */
-    private const string CONTRACTS_PACKAGE_PATTERN = '#^symfony/([a-z0-9-]+-)?contracts$#';
+    private const string OWN_MAJOR_LINE_PATTERN = '#^symfony/(([a-z0-9-]+-)?contracts|polyfill-[a-z0-9-]+)$#';
 
     /**
      * One alternative of a constraint that cannot leave a single major: ^3, ~3.1, 3.4.1, 3.*, 3.4.*.
@@ -261,10 +261,10 @@ final readonly class ComposerManifestRule implements RuleInterface
                 continue;
             }
 
-            if (preg_match(self::CONTRACTS_PACKAGE_PATTERN, $package) === 1) {
+            if (preg_match(self::OWN_MAJOR_LINE_PATTERN, $package) === 1) {
                 $violations = [
                     ...$violations,
-                    ...$this->checkContractsConstraint($package, is_string($constraint) ? $constraint : null),
+                    ...$this->checkOwnMajorLineConstraint($package, is_string($constraint) ? $constraint : null),
                 ];
 
                 continue;
@@ -291,7 +291,7 @@ final readonly class ComposerManifestRule implements RuleInterface
     /**
      * @return list<Violation>
      */
-    private function checkContractsConstraint(string $package, ?string $constraint): array
+    private function checkOwnMajorLineConstraint(string $package, ?string $constraint): array
     {
         if ($constraint !== null && $this->boundsEveryAlternative($constraint)) {
             return [];

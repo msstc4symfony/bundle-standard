@@ -387,6 +387,7 @@ final class ComposerManifestRuleTest extends TestCase
         yield 'deprecation contracts, exact version' => ['symfony/deprecation-contracts', '3.5.1'];
         yield 'contracts meta package, tilde and double pipe' => ['symfony/contracts', '~2.5 || ^3.0'];
         yield 'translation contracts, minor wildcard' => ['symfony/translation-contracts', '3.*'];
+        yield 'polyfill, its own 1.x line' => ['symfony/polyfill-php84', '^1.31'];
     }
 
     #[DataProvider('contractsConstraints')]
@@ -446,6 +447,28 @@ final class ComposerManifestRuleTest extends TestCase
 
         self::assertSame(
             [sprintf('require.symfony/service-contracts must bound each alternative to one major (^, ~ or an exact version), found "%s"', $shown)],
+            $this->messages(),
+        );
+    }
+
+    public function testReportsPolyfillWithoutABoundedConstraint(): void
+    {
+        $this->writeManifest([
+            'name' => 'msstc4symfony/tracing-bundle',
+            'license' => 'MIT',
+            'authors' => [self::AUTHOR],
+            'require' => [
+                'php' => '>=8.2',
+                'symfony/framework-bundle' => '^7.4|^8.0',
+                'symfony/polyfill-php84' => '*',
+            ],
+            'conflict' => ['symfony/symfony' => '*'],
+            'extra' => ['symfony' => ['require' => '^7.4|^8.0']],
+            'autoload' => ['psr-4' => ['MaxShamaev\\TracingBundle\\' => 'src/']],
+        ]);
+
+        self::assertSame(
+            ['require.symfony/polyfill-php84 must bound each alternative to one major (^, ~ or an exact version), found "*"'],
             $this->messages(),
         );
     }

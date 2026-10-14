@@ -55,8 +55,8 @@ interface RuleInterface
   строго по профилю (`>=8.2` по умолчанию), `autoload-dev.psr-4` не содержит чужих неймспейсов
   (защита от copy-paste, когда в новый бандл случайно попадает
   тестовый неймспейс другого бандла). Каждый `symfony/*` в `require` —
-  `^7.4|^8.0` (php82/php84; нижняя граница Symfony 7.4), кроме `symfony/monolog-bundle` и contracts
-  (`symfony/contracts`, `symfony/*-contracts`): у них своя линейка мажоров,
+  `^7.4|^8.0` (php82/php84; нижняя граница Symfony 7.4), кроме `symfony/monolog-bundle`, contracts
+  (`symfony/contracts`, `symfony/*-contracts`) и полифиллов (`symfony/polyfill-*`, с v2.0.1): у них своя линейка мажоров,
   поэтому допустим любой constraint, где каждая альтернатива привязана к
   одному мажору (`^3`, `~3.1`, `3.5.1`, `3.*`, допускается префикс `v`;
   дефисные диапазоны, `<`/`>`, `*`, `dev-*` — нарушение).

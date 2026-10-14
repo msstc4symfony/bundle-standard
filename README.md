@@ -23,7 +23,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v2.0.0
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v2.0.1
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -79,8 +79,8 @@ The rule set is assembled in `src/StandardDefinition::rules()` and also checks:
   keeps its `autoload-dev` namespace under the package's own root
   namespace.
 - every `symfony/*` entry in `require` uses `^7.4|^8.0`, except
-  `symfony/monolog-bundle` and the contracts packages (`symfony/contracts`,
-  `symfony/*-contracts`): these follow their own major line, so they may use any
+  `symfony/monolog-bundle`, the contracts packages (`symfony/contracts`,
+  `symfony/*-contracts`) and the polyfills (`symfony/polyfill-*`): these follow their own major line, so they may use any
   constraint whose every alternative stays within one major (`^2.5|^3`, `~3.0`,
   `3.5.1`, `3.*`); `*`, `>=2`, `<4`, hyphen ranges (`2.5 - 9`), AND forms (`>=3.1 <4`),
   stability flags (`^3@dev`) and `dev-main` are rejected.
@@ -156,7 +156,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v2.0.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v2.0.1
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:
