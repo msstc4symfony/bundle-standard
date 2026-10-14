@@ -118,6 +118,12 @@ rule needs `friendsofphp/php-cs-fixer` `^3.76` in `composer-ci.json`). `php84` i
 needs PHP 8.4: its templates are the shared ones targeting 8.4 (`phpVersion: 80400`, `withPhpSets(php84: true)`,
 no `new_expression_parentheses`).
 
+The tools run on PHP 8.4 and catch only part of what PHP 8.2 rejects: PHPStan flags typed class constants,
+`php -l` in the "minimal" job (PHP 8.2) catches the rest of the syntax. Nothing but the PHP 8.2/8.3 PHPUnit
+cells catches a PHP 8.3/8.4 function (`array_any`, `json_validate`, …): use one only with the matching
+`symfony/polyfill-php8x` in `require` (`require-dev` when only tests call it). Under `withPhpVersion(PHP_82)`
+Rector no longer adds `#[Override]` (a PHP 8.3 rule): packages that keep the attribute add it by hand.
+
 `php74` exists for packages that run inside another tool on older PHP — the Symfony bridge of the DTO
 generator runs in the generator's runtime, which supports PHP 7.4. Its templates differ only where PHP 7.4,
 PHPUnit 9.6 or Symfony 5.4 need it: `phpstan.dist.neon` (`phpVersion: 70400`), `.php-cs-fixer.dist.php` (no

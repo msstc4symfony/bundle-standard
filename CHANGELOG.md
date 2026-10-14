@@ -23,6 +23,8 @@
 - A package without a declared profile requires `php >=8.2` and takes the new `rector.php`, `phpstan.dist.neon`
   and `.php-cs-fixer.dist.php`; its code must parse on PHP 8.2 (no typed class constants, no `new X()->m()`);
   `composer-ci.json` requires `friendsofphp/php-cs-fixer` `^3.76` (`new_expression_parentheses`).
+- PHP 8.3/8.4 functions need the matching `symfony/polyfill-php8x` (in `require` when `src/` calls them); only the
+  PHP 8.2/8.3 PHPUnit cells catch a missing one. Rector no longer adds `#[Override]` to new code.
 - A package that needs PHP 8.4 declares `"extra": {"bundle-standard": {"runtime": "php84"}}` and takes the
   templates from `templates/php84/`.
 - A package passing its own `symfony-versions` adds each entry's lowest PHP: `"php":"8.2"` to Symfony 7.4,
