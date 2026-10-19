@@ -27,4 +27,69 @@ final class VerifyStandardCliTest extends TestCase
         self::assertContains('  - composer.json: extra.bundle-standard.runtime must be "php82" or "php84" or "php74", found "php80"', $output);
         self::assertContains('  - composer.json: must require php ">=8.2", found ">=7.4"', $output);
     }
+
+    public function testExitsWith2WhenATemplateIsBroken(): void
+    {
+        $root = sys_get_temp_dir() . '/cli-standard-' . uniqid('', true);
+        $bundleDir = $root . '/bundle';
+        mkdir($root . '/bin', 0o777, true);
+        mkdir($root . '/templates');
+        mkdir($bundleDir);
+        copy(__DIR__ . '/../../bin/verify-standard.php', $root . '/bin/verify-standard.php');
+        $vendor = realpath(__DIR__ . '/../../vendor');
+        self::assertIsString($vendor);
+        symlink($vendor, $root . '/vendor');
+        file_put_contents($root . '/templates/deptrac.yaml', "deptrac: {}\n");
+
+        try {
+            exec(\sprintf('%s %s %s 2>&1', escapeshellarg(PHP_BINARY), escapeshellarg($root . '/bin/verify-standard.php'), escapeshellarg($bundleDir)), $output, $exitCode);
+        } finally {
+            exec('rm -rf ' . escapeshellarg($root));
+        }
+
+        self::assertSame(2, $exitCode);
+        self::assertStringStartsWith('The standard cannot be loaded: ', $output[0] ?? '');
+    }
+
+    public function testExitsWith2WhenTheBundleCannotBeRead(): void
+    {
+        if (posix_geteuid() === 0) {
+            self::markTestSkipped('root reads directories regardless of their mode');
+        }
+
+        $bundleDir = sys_get_temp_dir() . '/cli-locked-' . uniqid('', true);
+        mkdir($bundleDir . '/src/Infrastructure/locked', 0o777, true);
+        chmod($bundleDir . '/src/Infrastructure/locked', 0o000);
+
+        try {
+            exec(\sprintf('%s %s %s 2>&1', escapeshellarg(PHP_BINARY), escapeshellarg(__DIR__ . '/../../bin/verify-standard.php'), escapeshellarg($bundleDir)), $output, $exitCode);
+        } finally {
+            chmod($bundleDir . '/src/Infrastructure/locked', 0o777);
+            exec('rm -rf ' . escapeshellarg($bundleDir));
+        }
+
+        self::assertSame(2, $exitCode);
+        self::assertStringStartsWith('The bundle cannot be read: ', $output[0] ?? '');
+    }
+
+    public function testExitsWith2WhenAFileOfTheBundleCannotBeRead(): void
+    {
+        if (posix_geteuid() === 0) {
+            self::markTestSkipped('root reads files regardless of their mode');
+        }
+
+        $bundleDir = sys_get_temp_dir() . '/cli-locked-file-' . uniqid('', true);
+        mkdir($bundleDir . '/src/Infrastructure', 0o777, true);
+        file_put_contents($bundleDir . '/src/Infrastructure/LockedPass.php', '<?php');
+        chmod($bundleDir . '/src/Infrastructure/LockedPass.php', 0o000);
+
+        try {
+            exec(\sprintf('%s %s %s 2>&1', escapeshellarg(PHP_BINARY), escapeshellarg(__DIR__ . '/../../bin/verify-standard.php'), escapeshellarg($bundleDir)), $output, $exitCode);
+        } finally {
+            exec('rm -rf ' . escapeshellarg($bundleDir));
+        }
+
+        self::assertSame(2, $exitCode);
+        self::assertSame('The bundle cannot be read: cannot read src/Infrastructure/LockedPass.php', $output[0] ?? '');
+    }
 }

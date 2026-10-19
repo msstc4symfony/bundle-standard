@@ -1,5 +1,27 @@
 # Changelog
 
+## 3.0.0 - 2026-10-19
+
+- Added: `DeptracConfigRule` — `deptrac.yaml` declares the canonical layers of `templates/deptrac.yaml` with
+  `^<bundle class>$` as `BundleRoot`, holds only `paths: [./src]`, `layers` and `ruleset`, and may only narrow the
+  canonical ruleset (`exclude_files` and `skip_violations` are rejected).
+- Added: `SourceLayoutRule` — `src/` holds only the layer directories, `Resources/` and one `<Name>Bundle.php`;
+  `src/Domain/` only the Domain and DomainService directories.
+- Added: `CompilerPassLocationRule` — every named or anonymous class that implements `CompilerPassInterface` or
+  extends a Symfony `…Pass` lives in `src/DependencyInjection/CompilerPass/`.
+- Added: `templates/deptrac.yaml`; root keys other than `deptrac` and transitive `+Layer` dependencies are rejected;
+  the key order inside a layer is not significant.
+- Added: `phpstan.dist.neon` (php82, php84) sets `checkMissingOverrideMethodAttribute: true` — `#[\Override]` on every
+  overriding or implementing method.
+- Added: `SourceLayoutRule` also rejects class declarations under `src/Resources/` and dot directories in `src/`.
+- Changed: `bin/verify-standard.php` exits with code 2 and "The standard cannot be loaded: …" when a template is broken
+  (checked even when the bundle lacks `deptrac.yaml`), and "The bundle cannot be read: …" for an unreadable directory or file.
+- Changed: the `php74` profile is exempt from the three layout rules.
+- Changed: `symfony/yaml` moved from `require-dev` to `require`.
+- Changed: the reference bundle of the test suite is skeleton-bundle.
+- Upgrading: copy `templates/deptrac.yaml` and `templates/phpstan.dist.neon`, move classes into the canonical layers, add
+  `#[\Override]` where PHPStan reports `method.missingOverride`.
+
 ## 2.0.1 - 2026-10-14
 
 - Fixed: `symfony/polyfill` and `symfony/polyfill-*` in `require` is checked like the contracts packages (one major per alternative,

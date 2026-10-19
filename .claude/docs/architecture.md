@@ -65,6 +65,44 @@ interface RuleInterface
   переиспользуется `ExactFileRule` и `ContainsRule` перед их
   специфичной проверкой (сначала убеждаемся, что есть что сравнивать).
 
+## Правила раскладки (v3, спек этапа B)
+
+Не применяются к профилю `php74` (`StandardDefinition`, `$layoutRules`).
+
+- `DeptracConfigRule` — разбирает `deptrac.yaml` (`symfony/yaml`, поэтому он в `require`). Шаблон разбирается
+  первым при каждом вызове (битый → `StandardTemplateException`, даже если у пакета нет `deptrac.yaml`). Корень —
+  только `deptrac` (deptrac грузит файл через Symfony DI: `imports`/`services` подмешали бы непроверенные правила).
+  `layers` сравниваются послойно после рекурсивной сортировки ключей map'ов (порядок слоёв и элементов списков
+  важен, порядок ключей и комментарии — нет); сообщение называет первый отличающийся слой. Плейсхолдер
+  `'%BUNDLE_CLASS_PATTERN%'` → `^<FQCN>$` с удвоенными `\\`: deptrac оборачивает значение `classLike` в `/…/i` и
+  сопоставляет без якорей (`AbstractTypeCollector::getPattern`, `ClassLikeToken::match`), без `^$` слой поймал бы
+  любой FQCN, содержащий имя бандла. FQCN — `BundleClass::of()`: один `src/<Name>Bundle.php`
+  (`BundleClass::FILE_PATTERN`, общий с `SourceLayoutRule`) + ровно один psr-4 префикс (с завершающим `\`) на
+  `src`/`./src/`. Нет/несколько бандл-классов — об этом сообщает `SourceLayoutRule`, а слои сравниваются без значения
+  `BundleRoot`; нет префикса — своё сообщение. Отсутствующий файл сообщает `FileExistsRule`. `ruleset` — подмножество
+  канона, `+Layer` запрещён. Значение в двойных кавычках YAML схлопывает `\\` → правило его отвергнет.
+- Известное ограничение (принято, спек раздел 2): directory-collector'ы канона (`src/Application/.*`) deptrac
+  оборачивает в `#…#i` и применяет к абсолютному пути без якоря; чекаут в каталоге вида `…/src/Application/…` или
+  вложенный `src/Infrastructure/Src/Domain/Entity/` дали бы двойное членство. `%projectDirectory%` в regex
+  потребовал бы экранирования пути — не делаем, в CI и у разработчиков таких путей нет.
+- `SourceLayoutRule` — верхний уровень `src/` и `src/Domain/`; dot-файлы пропускаются, dot-каталоги — нарушение;
+  PHP-файл под `src/Resources/` с объявлением class/interface/trait/enum — нарушение (вне всех слоёв deptrac).
+- `CompilerPassLocationRule` — токенизация (`PhpToken`), без загрузки классов; файл без подстроки «pass» не
+  токенизируется. Проверяются все классы файла, включая анонимные (скобки аргументов `new class (...)` учитываются);
+  импорты сбрасываются на каждом `namespace`. Pass = прямой `implements CompilerPassInterface` или `extends` класса
+  `Symfony\…Pass`. Наследник собственного абстрактного pass'а бандла не распознаётся (известное ограничение).
+- `#[Override]` — PHPStan `checkMissingOverrideMethodAttribute: true` в `phpstan.dist.neon` php82/php84. Rector-правило
+  `AddOverrideAttributeToOverriddenMethodsRector` не годится: при `withPhpVersion(PHP_82)` `PhpVersionedFilter`
+  выкидывает его (минимум PHP 8.3), а на 8.3+ оно не трогает реализации интерфейсов (проверено 2026-10-19 UTC,
+  Rector 2.7). PHPStan проверяет и при `phpVersion` 8.2–8.5. На PHP 8.2 класса `Override` нет — атрибуты не
+  инстанцируются, это безопасно.
+- `bin/verify-standard.php`: `StandardTemplateException` → exit 2 «The standard cannot be loaded»;
+  `UnexpectedValueException` (нечитаемый каталог — итератор; нечитаемый файл — `BundleFile::read()`) → exit 2
+  «The bundle cannot be read». Прочие исключения не перехватываются (ошибка верификатора). CLI-тесты с `chmod 000`
+  пропускаются под root (root читает всё).
+- Эталонный пакет `StandardDefinitionTest::testAcceptsTheReferenceBundle` — skeleton-bundle (рядом в checkout;
+  в CI пропускается).
+
 ## Три уровня проверки и почему они разные
 
 Три разных правила проверяют разную степень строгости не случайно, а

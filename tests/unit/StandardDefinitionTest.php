@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\BundleStandard\Test\Unit;
 
+use Msstc4Symfony\BundleStandard\Rule\CompilerPassLocationRule;
+use Msstc4Symfony\BundleStandard\Rule\DeptracConfigRule;
 use Msstc4Symfony\BundleStandard\Rule\RuleInterface;
+use Msstc4Symfony\BundleStandard\Rule\SourceLayoutRule;
 use Msstc4Symfony\BundleStandard\RuntimeProfile;
 use Msstc4Symfony\BundleStandard\StandardDefinition;
 use Msstc4Symfony\BundleStandard\Verifier;
@@ -41,6 +44,7 @@ final class StandardDefinitionTest extends TestCase
             self::assertContains('Makefile', $files);
             self::assertContains('composer.json', $files);
             self::assertContains('deptrac.yaml', $files);
+            self::assertContains('src', $files);
             self::assertContains('infection.json5', $files);
             self::assertContains('.github/workflows/checks.yml', $files);
         } finally {
@@ -157,12 +161,30 @@ final class StandardDefinitionTest extends TestCase
         return array_map(static fn (Violation $v): string => $v->file, $violations);
     }
 
+    public function testAppliesTheLayoutRulesExceptUnderPhp74(): void
+    {
+        $classes = static fn (RuntimeProfile $profile): array => array_map(
+            static fn (RuleInterface $rule): string => $rule::class,
+            StandardDefinition::rules(self::TEMPLATES_DIR, $profile),
+        );
+
+        foreach ([RuntimeProfile::Php82, RuntimeProfile::Php84] as $profile) {
+            self::assertContains(DeptracConfigRule::class, $classes($profile));
+            self::assertContains(SourceLayoutRule::class, $classes($profile));
+            self::assertContains(CompilerPassLocationRule::class, $classes($profile));
+        }
+
+        self::assertNotContains(DeptracConfigRule::class, $classes(RuntimeProfile::Php74));
+        self::assertNotContains(SourceLayoutRule::class, $classes(RuntimeProfile::Php74));
+        self::assertNotContains(CompilerPassLocationRule::class, $classes(RuntimeProfile::Php74));
+    }
+
     public function testAcceptsTheReferenceBundle(): void
     {
-        $reference = __DIR__ . '/../../../logger-bundle';
+        $reference = __DIR__ . '/../../../skeleton-bundle';
 
         if (!is_dir($reference)) {
-            self::markTestSkipped('logger-bundle checkout is not available next to bundle-standard');
+            self::markTestSkipped('skeleton-bundle checkout is not available next to bundle-standard');
         }
 
         $profile = RuntimeProfile::declaredBy($reference) ?? RuntimeProfile::Php82;

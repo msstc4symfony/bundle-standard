@@ -18,7 +18,10 @@ final class Php74TemplatesTest extends TestCase
     public function testPhpstanAnalysesForPhp74(): void
     {
         self::assertSame(
-            str_replace("phpVersion:\n        min: 80200\n        max: 80599", 'phpVersion: 70400', $this->read('phpstan.dist.neon')),
+            strtr($this->read('phpstan.dist.neon'), [
+                "phpVersion:\n        min: 80200\n        max: 80599" => 'phpVersion: 70400',
+                "    checkMissingOverrideMethodAttribute: true\n" => '',
+            ]),
             $this->read('php74/phpstan.dist.neon'),
         );
     }

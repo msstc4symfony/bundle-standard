@@ -23,7 +23,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v2.0.1
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.0.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -56,11 +56,12 @@ The rule set applies three verification strengths, chosen per file:
 | Byte-for-byte match except the `level:` line, which must be `9`, `10` or `max` | `phpstan.dist.neon` | `PhpstanConfigRule` |
 | Key-value check | `.github/workflows/checks.yml`, `composer.json` | `ContainsRule`, `ComposerManifestRule` |
 | Existence / absence | `composer-ci.json`, `phpstan-baseline.neon`, `deptrac.yaml`, `LICENSE`, `SECURITY.md`, `README.md`, `CLAUDE.md`, `psalm.xml` | `FileExistsRule`, `FileAbsentRule` |
+| Layout (not under `php74`) | `deptrac.yaml` (canonical layers, ruleset may only be narrowed, no `exclude_files`/`skip_violations`), `src/` (only the layer directories and `<Name>Bundle.php`), compiler passes only in `src/DependencyInjection/CompilerPass/` | `DeptracConfigRule`, `SourceLayoutRule`, `CompilerPassLocationRule` |
 
 Tool configuration is identical in every bundle. Bundle specifics live in the
 files made for them:
 
-- `deptrac.yaml` — the bundle's own layers;
+- `deptrac.yaml` — a narrower ruleset than the canonical one (the layers themselves are fixed);
 - `phpstan-baseline.neon` — accepted findings, each with a reason (e.g. a test fixture that
   deliberately extends a class from a package that is not installed);
 - `composer.json` / `composer-ci.json` — dependencies and optional libraries;
@@ -90,12 +91,26 @@ The rule set is assembled in `src/StandardDefinition::rules()` and also checks:
   tag (`@vX.Y.Z`, never `@main`).
 - `psalm.xml` and `psalm-baseline.xml` are absent — the standard uses
   PHPStan only.
+- the hex layout (every profile except `php74`, whose packages run inside other tools):
+  `deptrac.yaml` declares exactly the layers of `templates/deptrac.yaml` — `Domain`, `DomainService`,
+  `Application`, `Infrastructure`, `Presentation`, `Framework`, `DependencyInjection`, `BundleRoot` — with the
+  `BundleRoot` value set to `^<bundle class>$` (derived from the one `autoload.psr-4` prefix of `src/` and
+  `src/<Name>Bundle.php`, backslashes doubled); `deptrac` holds only `paths: [./src]`, `layers` and `ruleset`; every ruleset entry is a subset of the
+  canonical one. `src/` holds only those layer directories, `Resources/` and exactly one `<Name>Bundle.php`;
+  `src/Domain/` only the Domain and DomainService directories; no PHP file under `src/Resources/` declares a class.
+  `deptrac.yaml` has no root key besides `deptrac` (`imports` or `services` would merge in rules unchecked) and no
+  transitive `+Layer` dependencies. Every class — named or anonymous — that directly implements
+  `CompilerPassInterface` or extends a Symfony class ending in `Pass` (`AbstractRecursivePass`,
+  `RegisterListenersPass`, …) lives under `src/DependencyInjection/CompilerPass/`. The check reads tokens and never
+  loads classes, so a child of the bundle's own abstract pass is not recognised — its base class is.
 
 ## Starting a new bundle
 
 Create the repository from the [`skeleton-bundle`](https://github.com/msstc4symfony/skeleton-bundle)
 template and run `php bin/init <Name> "<description>"`: the result already complies with this standard
 and passes `php-bundle.yml`.
+Its `deptrac.yaml` is `templates/deptrac.yaml` with the full canonical ruleset; narrow it as the bundle's
+layers settle.
 
 ## Runtime profiles
 
@@ -163,7 +178,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v2.0.1
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.0.0
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:
@@ -257,6 +272,15 @@ bundle's checkout.
 `PhpstanConfigRule`) compares against byte-for-byte: `.php-cs-fixer.dist.php`, `phpstan-ci.neon`, `phpstan.dist.neon`,
 `rector.php`, `Makefile`, `phpunit.xml.dist`, `infection.json5`, `codecov.yml` and `gitignore`
 (copied to the bundle as `.gitignore`; stored without the dot so it does not apply here).
+
+`templates/deptrac.yaml` is copied too, with its `'%BUNDLE_CLASS_PATTERN%'` replaced by the anchored bundle class
+(`^Msstc4Symfony\\FooBundle\\FooBundle$` as a plain or single-quoted scalar — double quotes would collapse the
+backslashes; the anchors are needed because deptrac applies the value as a regex without them); `DeptracConfigRule` compares its layers and ruleset after
+parsing, so comments and the key order inside a layer may differ. `phpstan.dist.neon` (php82, php84) sets
+`checkMissingOverrideMethodAttribute: true`: every method that overrides a parent or implements an interface
+method carries `#[\Override]`. Rector cannot add it under `withPhpVersion(PHP_82)` (the rule needs PHP 8.3) and
+skips interface methods, so PHPStan enforces it; on PHP 8.2 the attribute class does not exist, which is harmless
+because attributes are not instantiated.
 
 A bundle brings itself into compliance by copying these files in as-is.
 

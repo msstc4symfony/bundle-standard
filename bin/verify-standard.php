@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 use Msstc4Symfony\BundleStandard\RuntimeProfile;
 use Msstc4Symfony\BundleStandard\StandardDefinition;
+use Msstc4Symfony\BundleStandard\StandardTemplateException;
 use Msstc4Symfony\BundleStandard\Verifier;
 
 // Installed as a dependency, this file sits at vendor/msstc4symfony/bundle-standard/bin/;
@@ -34,7 +35,19 @@ $bundlePath = rtrim((string) realpath($bundlePath), '/');
 // An unknown profile is reported by RuntimeProfileRule; the rest is checked against the default one.
 $profile = RuntimeProfile::declaredBy($bundlePath) ?? RuntimeProfile::Php82;
 $verifier = new Verifier(StandardDefinition::rules(__DIR__ . '/../templates', $profile));
-$violations = $verifier->verify($bundlePath);
+
+try {
+    $violations = $verifier->verify($bundlePath);
+} catch (StandardTemplateException $e) {
+    fwrite(STDERR, 'The standard cannot be loaded: ' . $e->getMessage() . "\n");
+
+    exit(2);
+} catch (UnexpectedValueException $e) {
+    // Directory iterators throw it for an unreadable directory of the bundle.
+    fwrite(STDERR, 'The bundle cannot be read: ' . $e->getMessage() . "\n");
+
+    exit(2);
+}
 
 if ($violations === []) {
     fwrite(STDOUT, sprintf("Bundle at %s complies with the standard.\n", $bundlePath));

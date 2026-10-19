@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\BundleStandard;
 
+use Msstc4Symfony\BundleStandard\Rule\CompilerPassLocationRule;
 use Msstc4Symfony\BundleStandard\Rule\ComposerManifestRule;
 use Msstc4Symfony\BundleStandard\Rule\ContainsRule;
+use Msstc4Symfony\BundleStandard\Rule\DeptracConfigRule;
 use Msstc4Symfony\BundleStandard\Rule\ExactFileRule;
 use Msstc4Symfony\BundleStandard\Rule\FileAbsentRule;
 use Msstc4Symfony\BundleStandard\Rule\FileExistsRule;
 use Msstc4Symfony\BundleStandard\Rule\PhpstanConfigRule;
 use Msstc4Symfony\BundleStandard\Rule\RuleInterface;
 use Msstc4Symfony\BundleStandard\Rule\RuntimeProfileRule;
+use Msstc4Symfony\BundleStandard\Rule\SourceLayoutRule;
 
 final readonly class StandardDefinition
 {
@@ -26,6 +29,13 @@ final readonly class StandardDefinition
         if ($templatesDir === '') {
             $templatesDir = '/';
         }
+
+        // php74 packages run inside other tools (the DTO generator) and are not hex-layered Symfony bundles.
+        $layoutRules = $profile === RuntimeProfile::Php74 ? [] : [
+            new DeptracConfigRule($profile->template($templatesDir, 'deptrac.yaml')),
+            new SourceLayoutRule(),
+            new CompilerPassLocationRule(),
+        ];
 
         return [
             // Byte-identical across bundles of one runtime profile: bundle specifics belong in deptrac.yaml,
@@ -59,6 +69,8 @@ final readonly class StandardDefinition
 
             new FileAbsentRule('psalm.xml', 'the standard uses PHPStan only'),
             new FileAbsentRule('psalm-baseline.xml', 'the standard uses PHPStan only'),
+
+            ...$layoutRules,
         ];
     }
 }
