@@ -284,6 +284,11 @@ because attributes are not instantiated.
 
 A bundle brings itself into compliance by copying these files in as-is.
 
+## Shared service decoration
+
+Family bundles that decorate the same Symfony service (`http_client.transport`) register their priority in
+[`doc/decoration-priorities.md`](doc/decoration-priorities.md) and must not depend on each other's order.
+
 ## Development
 
 ```sh
