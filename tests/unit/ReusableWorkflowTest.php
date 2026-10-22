@@ -113,6 +113,46 @@ final class ReusableWorkflowTest extends TestCase
         self::assertStringContainsString('--prefer-lowest', self::workflowStepRun('phpunit', 'composer update'));
     }
 
+    public function testPhpstanRunsAgainstEachSymfonyVersionInItsPrimaryPhpCell(): void
+    {
+        self::assertSame('boolean', self::workflowValue('on', 'workflow_call', 'inputs', 'run-phpstan-per-symfony', 'type'));
+        self::assertTrue(self::workflowValue('on', 'workflow_call', 'inputs', 'run-phpstan-per-symfony', 'default'));
+
+        $installedAt = null;
+        $phpunitAt = null;
+        $phpstanAt = null;
+        $phpstan = null;
+        foreach (array_values(self::workflowMap('jobs', 'phpunit', 'steps')) as $index => $step) {
+            self::assertIsArray($step);
+            $run = $step['run'] ?? '';
+            self::assertIsString($run);
+            if (($step['id'] ?? null) === 'installed') {
+                $installedAt = $index;
+            }
+            if (str_contains($run, 'vendor/bin/phpunit')) {
+                $phpunitAt = $index;
+            }
+            if (str_contains($run, 'phpstan analyse')) {
+                $phpstanAt = $index;
+                $phpstan = $step;
+                self::assertStringContainsString('-c phpstan-ci.neon', $run);
+            }
+        }
+
+        self::assertIsArray($phpstan, 'The phpunit job has no PHPStan step');
+        self::assertSame(
+            "inputs.run-phpstan-per-symfony && matrix.php == env.PRIMARY_PHP && matrix.dependencies == 'highest' && !cancelled() && steps.installed.outcome == 'success'",
+            $phpstan['if'] ?? null,
+        );
+        self::assertSame(['XDEBUG_MODE' => 'off'], $phpstan['env'] ?? null);
+        // After the version check, so it never analyses against another Symfony major than the cell's, and after
+        // PHPUnit, so a PHPStan finding does not hide the test results.
+        self::assertIsInt($installedAt);
+        self::assertGreaterThan($installedAt, $phpstanAt);
+        self::assertIsInt($phpunitAt);
+        self::assertGreaterThan($phpunitAt, $phpstanAt);
+    }
+
     public function testDefaultPhpMatrixCoversPhp82To85(): void
     {
         self::assertSame('["8.2","8.3","8.4","8.5"]', self::workflowValue('on', 'workflow_call', 'inputs', 'php-versions', 'default'));
@@ -139,6 +179,7 @@ final class ReusableWorkflowTest extends TestCase
                 'SYMFONY_VERSIONS' => '${{ inputs.symfony-versions }}',
                 'PREFER_LOWEST' => '${{ inputs.run-prefer-lowest }}',
                 'RUN_CODECOV' => '${{ inputs.run-codecov }}',
+                'RUN_PHPSTAN' => '${{ inputs.run-phpstan-per-symfony }}',
             ],
             $env,
         );

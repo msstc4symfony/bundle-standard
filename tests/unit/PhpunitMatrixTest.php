@@ -122,6 +122,34 @@ final class PhpunitMatrixTest extends TestCase
         self::assertStringNotContainsString('::warning::', $codecovOff);
     }
 
+    public function testWarnsForEachSymfonyEntryWithoutAPrimaryPhpCellWhenPhpstanRunsPerSymfony(): void
+    {
+        $symfony = '[{"version":"7.4.*","label":"7.4","codecov":false,"php":"8.2"},{"version":"8.*","label":"8","codecov":false,"php":"8.4"}]';
+        [, $covered] = $this->runScript('["8.2","8.4"]', $symfony, 'true', runPhpstan: 'true');
+        [, $uncovered] = $this->runScript('["8.2","8.5"]', $symfony, 'true', runPhpstan: 'true');
+        [, $phpstanOff] = $this->runScript('["8.2","8.5"]', $symfony, 'true');
+
+        self::assertStringNotContainsString('::warning::', $covered);
+        self::assertSame(2, substr_count($uncovered, '::warning::run-phpstan-per-symfony is on but no cell runs PHP 8.4'), $uncovered);
+        self::assertStringContainsString('with Symfony 7.4: PHPStan', $uncovered);
+        self::assertStringContainsString('with Symfony 8: PHPStan', $uncovered);
+        self::assertStringNotContainsString('::warning::', $phpstanOff);
+    }
+
+    public function testWarnsOnlyForTheSymfonyEntryWhosePhpFloorIsAbovePrimaryPhp(): void
+    {
+        [, $output] = $this->runScript(
+            '["8.4","8.5"]',
+            '[{"version":"7.4.*","label":"7.4","codecov":false},{"version":"9.*","label":"9","codecov":false,"php":"8.5"}]',
+            'false',
+            runPhpstan: 'true',
+        );
+
+        self::assertSame(1, substr_count($output, 'run-phpstan-per-symfony is on'), $output);
+        self::assertStringContainsString('with Symfony 9: PHPStan', $output);
+        self::assertStringNotContainsString('with Symfony 7.4', $output);
+    }
+
     public function testFailsWhenNoCellRemains(): void
     {
         [$exitCode, $output] = $this->runScript('["8.2"]', '[{"version":"8.*","label":"8","codecov":true,"php":"8.4"}]', 'true');
@@ -155,7 +183,7 @@ final class PhpunitMatrixTest extends TestCase
     /**
      * @return array{int, string}
      */
-    private function runScript(string $phpVersions, string $symfonyVersions, string $preferLowest, string $runCodecov = 'false'): array
+    private function runScript(string $phpVersions, string $symfonyVersions, string $preferLowest, string $runCodecov = 'false', string $runPhpstan = 'false'): array
     {
         // stderr joins stdout inside bash: one pipe cannot deadlock on a full second one.
         $process = proc_open(
@@ -169,6 +197,7 @@ final class PhpunitMatrixTest extends TestCase
                 'SYMFONY_VERSIONS' => $symfonyVersions,
                 'PREFER_LOWEST' => $preferLowest,
                 'RUN_CODECOV' => $runCodecov,
+                'RUN_PHPSTAN' => $runPhpstan,
                 'PRIMARY_PHP' => self::scalar(self::workflowValue('env', 'PRIMARY_PHP')),
                 'GITHUB_OUTPUT' => $this->bundleDir . '/output',
             ],

@@ -23,7 +23,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.1.0
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.2.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -178,7 +178,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.1.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.2.0
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:
@@ -203,6 +203,7 @@ Inputs (all optional except `slug`):
 | `infection-min-covered-msi` | `55` | Minimum MSI over the mutants covered by tests, in percent. |
 | `run-bc-check` | `true` | Run the Roave backward-compatibility check (blocking, see below). |
 | `run-prefer-lowest` | `true` | Add the `--prefer-lowest` PHPUnit cell (see below). |
+| `run-phpstan-per-symfony` | `true` | Run PHPStan again in the PHP 8.4 PHPUnit cell of each `symfony-versions` entry (see below). |
 | `elasticsearch` | `[]` | JSON array of `{elastica,image}`; adds an Elasticsearch integration job per entry (see below). `[]` or an empty string skips it. |
 | `run-codecov` | `false` | Upload coverage and test results to Codecov; requires the `CODECOV_TOKEN` secret. |
 
@@ -231,6 +232,16 @@ loses trailing zeros (`8.10` reads as `8.1`). When no pair remains the job fails
 starting an empty matrix; with `run-codecov` on and no cell on PHP 8.4 with a `codecov` Symfony entry, it warns
 that nothing will be uploaded. Each cell removes Roave BC check, DEPTRAC and Infection from the CI manifest
 before resolving: they run in their own jobs on PHP 8.4, and Infection 0.32 does not install on PHP 8.2.
+
+**PHPStan per Symfony version.** The `PHPStan` job analyses the install of the `setup` job, which is cached by
+the CI manifest: it sees one Symfony version, and the dependency releases of the day the cache was filled. With
+`run-phpstan-per-symfony` on, the PHP 8.4 cell of each `symfony-versions` entry also runs
+`phpstan analyse -c phpstan-ci.neon` against the dependencies it has just resolved, after the PHPUnit run, so
+API that differs between Symfony versions and newer dependency releases fail the build in that cell. A finding
+for one version only goes into `phpstan-baseline.neon`: `phpstan-ci.neon` does not report its pattern as
+unmatched on the others. The cell has removed Roave BC check, DEPTRAC and Infection before resolving, so a
+reference to their classes is a `class.notFound` here only; it goes into the baseline too. The `matrix` job
+warns for an entry with no PHP 8.4 cell, which PHPStan skips.
 
 **Prefer-lowest cell.** One extra PHPUnit cell runs on the first remaining pair of the matrix — the first entry
 of `php-versions` with the first entry of `symfony-versions` it can install (keep both lists ordered lowest

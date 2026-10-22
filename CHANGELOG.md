@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.2.0 - 2026-10-22
+
+- Added: the `run-phpstan-per-symfony` input (default `true`). The PHP 8.4 PHPUnit cell of each `symfony-versions`
+  entry also runs `phpstan analyse -c phpstan-ci.neon` against the dependencies it has just resolved. The `PHPStan`
+  job sees one Symfony version only, and the dependency releases of the day its cache was filled. The `matrix` job
+  warns for an entry that has no PHP 8.4 cell.
+- Upgrading: no file changes. The new step may report findings that the `PHPStan` job does not. Fix them, or add
+  one-version findings to `phpstan-baseline.neon`. A package whose code targets several majors of an optional
+  library at once (Elastica 7 next to 8/9) cannot be analysed against one install: set
+  `run-phpstan-per-symfony: false`.
+
 ## 3.1.0 - 2026-10-22
 
 - Added: `.php-cs-fixer.dist.php` (all profiles) enables `ordered_class_elements` with its default order.

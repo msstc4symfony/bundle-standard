@@ -55,6 +55,11 @@ on:
         required: false
         type: boolean
         default: true
+      run-phpstan-per-symfony:
+        description: 'Run PHPStan again in the PRIMARY_PHP PHPUnit cell of each symfony-versions entry, against the dependencies that cell resolves'
+        required: false
+        type: boolean
+        default: true
       run-codecov:
         description: 'Upload coverage and test results to Codecov (needs the CODECOV_TOKEN secret)'
         required: false
@@ -85,7 +90,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: msstc4symfony/bundle-standard
-          ref: v3.1.0
+          ref: v3.2.0
           path: standard
 
       - uses: shivammathur/setup-php@v2
@@ -301,6 +306,7 @@ jobs:
           SYMFONY_VERSIONS: ${{ inputs.symfony-versions }}
           PREFER_LOWEST: ${{ inputs.run-prefer-lowest }}
           RUN_CODECOV: ${{ inputs.run-codecov }}
+          RUN_PHPSTAN: ${{ inputs.run-phpstan-per-symfony }}
         run: |
           profile=$(jq -r '.extra["bundle-standard"].runtime // "php82"' composer.json)
           case "${profile}" in
@@ -325,6 +331,15 @@ jobs:
             '[.[] | select((.php | tostring) == $primary and .symfony.codecov == true and .dependencies == "highest")] | length' \
             <<<"${include}")" = 0 ]; then
             echo "::warning::run-codecov is on but no cell runs PHP ${PRIMARY_PHP} with a codecov Symfony entry: nothing is uploaded"
+          fi
+          # PHPStan runs in the PRIMARY_PHP cell of each Symfony entry only.
+          if [ "${RUN_PHPSTAN}" = true ]; then
+            jq -r --arg primary "${PRIMARY_PHP}" --argjson sf "${SYMFONY_VERSIONS}" '
+              [.[] | select((.php | tostring) == $primary and .dependencies == "highest") | .symfony.label] as $covered
+              | $sf[] | select(.label as $l | $covered | index($l) | not) | .label' <<<"${include}" \
+              | while read -r label; do
+                  echo "::warning::run-phpstan-per-symfony is on but no cell runs PHP ${PRIMARY_PHP} with Symfony ${label}: PHPStan does not analyse against it"
+                done
           fi
           echo "Runtime profile ${profile}: PHP ${php}+"
           echo "include=${include}" >> "$GITHUB_OUTPUT"
@@ -404,6 +419,7 @@ jobs:
       # Guards against the cell silently running another Symfony major than its label
       # (a dependency capping or lifting the version past the pins above).
       - name: Assert the matrix Symfony version was installed
+        id: installed
         env:
           SYMFONY_LABEL: ${{ matrix.symfony.label }}
         run: |
@@ -414,6 +430,14 @@ jobs:
           esac
 
       - run: XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit junit.xml
+
+      # The PHPStan job analyses the cached CI install only, one Symfony version: API that changed between the
+      # versions, and dependency releases since that install, surface here.
+      - name: PHPStan against this Symfony version
+        if: inputs.run-phpstan-per-symfony && matrix.php == env.PRIMARY_PHP && matrix.dependencies == 'highest' && !cancelled() && steps.installed.outcome == 'success'
+        env:
+          XDEBUG_MODE: 'off'
+        run: vendor/bin/phpstan analyse --memory-limit=512M --no-progress -c phpstan-ci.neon
 
       - if: ${{ inputs.run-codecov && matrix.symfony.codecov && matrix.php == env.PRIMARY_PHP && matrix.dependencies == 'highest' && !cancelled() }}
         uses: codecov/codecov-action@v6
