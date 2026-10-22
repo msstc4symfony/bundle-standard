@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.1.0 - 2026-10-22
+
+- Added: `.php-cs-fixer.dist.php` (all profiles) enables `ordered_class_elements` with its default order.
+- Fixed: the `Makefile` template declares every target in `.PHONY`; the `test` and `test-integration` hints no
+  longer claim that every integration suite needs the `composer-ci.json` install.
+- Fixed: the comments of `phpunit.xml.dist` (deprecations silenced with `@`, such as `trigger_deprecation()`, are
+  not counted) and `phpstan-ci.neon` (the baseline may, not must, carry `class.notFound` entries).
+- Upgrading: copy `.php-cs-fixer.dist.php`, `Makefile`, `phpunit.xml.dist` and `phpstan-ci.neon` of your profile (the
+  `php74` `phpunit.xml.dist` is unchanged) and run `make fix`: it moves class elements in `src/` and `tests/` into the
+  rule's order without changing any logic.
+
 ## 3.0.0 - 2026-10-19
 
 - Added: `DeptracConfigRule` — `deptrac.yaml` declares the canonical layers of `templates/deptrac.yaml` with

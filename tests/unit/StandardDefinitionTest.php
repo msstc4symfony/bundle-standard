@@ -151,16 +151,6 @@ final class StandardDefinitionTest extends TestCase
         }
     }
 
-    /**
-     * @param list<Violation> $violations
-     *
-     * @return list<string>
-     */
-    private function files(array $violations): array
-    {
-        return array_map(static fn (Violation $v): string => $v->file, $violations);
-    }
-
     public function testAppliesTheLayoutRulesExceptUnderPhp74(): void
     {
         $classes = static fn (RuntimeProfile $profile): array => array_map(
@@ -194,5 +184,15 @@ final class StandardDefinitionTest extends TestCase
             [],
             array_map(static fn (Violation $v): string => $v->format(), $violations),
         );
+    }
+
+    /**
+     * @param list<Violation> $violations
+     *
+     * @return list<string>
+     */
+    private function files(array $violations): array
+    {
+        return array_map(static fn (Violation $v): string => $v->file, $violations);
     }
 }

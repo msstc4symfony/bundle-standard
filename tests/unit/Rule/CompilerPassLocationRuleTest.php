@@ -24,14 +24,6 @@ final class CompilerPassLocationRuleTest extends TestCase
         $this->removeBundle();
     }
 
-    /**
-     * @return list<string>
-     */
-    private function files(): array
-    {
-        return array_map(static fn (Violation $v): string => $v->file, new CompilerPassLocationRule()->check($this->bundleDir));
-    }
-
     public function testAcceptsPassesInTheirLocation(): void
     {
         $this->write('src/DependencyInjection/CompilerPass/Nested/FooPass.php', <<<'PHP'
@@ -159,14 +151,6 @@ final class CompilerPassLocationRuleTest extends TestCase
 
         $this->write('src/Resources/config/pass.txt', 'class X implements CompilerPassInterface {}');
         self::assertSame([], $this->files());
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function messages(): array
-    {
-        return array_map(static fn (Violation $v): string => $v->format(), new CompilerPassLocationRule()->check($this->bundleDir));
     }
 
     public function testChecksEveryClassOfAFile(): void
@@ -312,5 +296,21 @@ final class CompilerPassLocationRuleTest extends TestCase
             PHP);
 
         self::assertSame(['src/Kind.php'], $this->files());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function files(): array
+    {
+        return array_map(static fn (Violation $v): string => $v->file, new CompilerPassLocationRule()->check($this->bundleDir));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function messages(): array
+    {
+        return array_map(static fn (Violation $v): string => $v->format(), new CompilerPassLocationRule()->check($this->bundleDir));
     }
 }

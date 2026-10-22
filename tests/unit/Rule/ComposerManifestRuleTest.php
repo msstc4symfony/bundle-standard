@@ -45,34 +45,6 @@ final class ComposerManifestRuleTest extends TestCase
         rmdir($this->bundleDir);
     }
 
-    private function writeExtension(string $body): void
-    {
-        mkdir($this->bundleDir . '/src/DependencyInjection', 0o777, true);
-        file_put_contents($this->bundleDir . '/src/DependencyInjection/FooExtension.php', "<?php\n" . $body);
-    }
-
-    /**
-     * @param array<string, mixed> $manifest
-     */
-    private function writeManifest(array $manifest): void
-    {
-        file_put_contents(
-            $this->bundleDir . '/composer.json',
-            json_encode($manifest, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
-        );
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function messages(): array
-    {
-        return array_map(
-            static fn (Violation $v): string => $v->message,
-            (new ComposerManifestRule())->check($this->bundleDir),
-        );
-    }
-
     public function testPassesOnCompliantManifest(): void
     {
         $this->writeManifest([
@@ -546,5 +518,33 @@ final class ComposerManifestRuleTest extends TestCase
 
         self::assertCount(1, $violations);
         self::assertSame('must decode to a JSON object', $violations[0]->message);
+    }
+
+    private function writeExtension(string $body): void
+    {
+        mkdir($this->bundleDir . '/src/DependencyInjection', 0o777, true);
+        file_put_contents($this->bundleDir . '/src/DependencyInjection/FooExtension.php', "<?php\n" . $body);
+    }
+
+    /**
+     * @param array<string, mixed> $manifest
+     */
+    private function writeManifest(array $manifest): void
+    {
+        file_put_contents(
+            $this->bundleDir . '/composer.json',
+            json_encode($manifest, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function messages(): array
+    {
+        return array_map(
+            static fn (Violation $v): string => $v->message,
+            (new ComposerManifestRule())->check($this->bundleDir),
+        );
     }
 }

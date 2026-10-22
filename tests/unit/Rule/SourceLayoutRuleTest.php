@@ -28,14 +28,6 @@ final class SourceLayoutRuleTest extends TestCase
         $this->removeBundle();
     }
 
-    /**
-     * @return list<string>
-     */
-    private function violations(): array
-    {
-        return array_map(static fn (Violation $v): string => $v->format(), new SourceLayoutRule()->check($this->bundleDir));
-    }
-
     public function testAcceptsTheCanonicalLayout(): void
     {
         $this->write('src/FooBundle.php', '<?php');
@@ -150,5 +142,13 @@ final class SourceLayoutRuleTest extends TestCase
             ['src/Resources/Inline.php: declares a class outside every layer: move it into a layer directory'],
             $this->violations(),
         );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function violations(): array
+    {
+        return array_map(static fn (Violation $v): string => $v->format(), new SourceLayoutRule()->check($this->bundleDir));
     }
 }

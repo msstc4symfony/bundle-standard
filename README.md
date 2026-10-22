@@ -23,7 +23,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.0.0
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.1.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -178,7 +178,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.0.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.1.0
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:

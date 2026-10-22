@@ -31,33 +31,6 @@ final class DeptracConfigRuleTest extends TestCase
         $this->removeBundle();
     }
 
-    private function canonical(): string
-    {
-        $template = file_get_contents(self::TEMPLATE);
-        self::assertIsString($template);
-
-        return str_replace("'" . DeptracConfigRule::BUNDLE_ROOT_PLACEHOLDER . "'", self::BUNDLE_PATTERN, $template);
-    }
-
-    private function withRuleset(string $ruleset): string
-    {
-        $config = preg_replace('/^    ruleset:.*\z/ms', "    ruleset:\n" . $ruleset, $this->canonical());
-        self::assertIsString($config);
-
-        return $config;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function messages(): array
-    {
-        return array_map(
-            static fn (Violation $v): string => $v->message,
-            new DeptracConfigRule(self::TEMPLATE)->check($this->bundleDir),
-        );
-    }
-
     public function testAcceptsTheTemplateWithTheBundleClass(): void
     {
         $this->write('deptrac.yaml', $this->canonical());
@@ -241,6 +214,33 @@ final class DeptracConfigRuleTest extends TestCase
         self::assertSame(
             ['deptrac.layers[5] (Framework) differs from bundle-standard templates/deptrac.yaml: copy the canonical layers as-is, with the BundleRoot value set to the bundle class'],
             $this->messages(),
+        );
+    }
+
+    private function canonical(): string
+    {
+        $template = file_get_contents(self::TEMPLATE);
+        self::assertIsString($template);
+
+        return str_replace("'" . DeptracConfigRule::BUNDLE_ROOT_PLACEHOLDER . "'", self::BUNDLE_PATTERN, $template);
+    }
+
+    private function withRuleset(string $ruleset): string
+    {
+        $config = preg_replace('/^    ruleset:.*\z/ms', "    ruleset:\n" . $ruleset, $this->canonical());
+        self::assertIsString($config);
+
+        return $config;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function messages(): array
+    {
+        return array_map(
+            static fn (Violation $v): string => $v->message,
+            new DeptracConfigRule(self::TEMPLATE)->check($this->bundleDir),
         );
     }
 }

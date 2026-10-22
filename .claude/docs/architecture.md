@@ -216,3 +216,17 @@ interface RuleInterface
   php74 — 5.4.0); расхождение ловит `RectorTemplateTest`.
 - Проверка: `vendor/bin/rector composer-based | grep symfony/ | grep -E '>=(7|8)'`
   не должна содержать `yes`.
+
+## v3.1.0 (2026-10-22 UTC): шаблоны Makefile, phpunit, phpstan-ci, cs-fixer
+
+- Все три `.php-cs-fixer.dist.php` (и собственный конфиг репозитория) включают `ordered_class_elements` с порядком
+  по умолчанию (константы и свойства до конструктора, `phpunit`-методы до публичных, static-провайдеры данных — среди
+  публичных методов). Замер на 2026-10-22: при переходе переставлено ~36 файлов на 15 репозиториях, логика не менялась.
+- `MakefileTemplateTest`: каждая цель шаблона `Makefile` в `.PHONY` (строк `.PHONY` может быть несколько) и у каждой
+  есть `## `-подсказка — `help` собирает список из них.
+- `phpunit.xml.dist`: `ignoreSuppressionOfDeprecations` выключен сознательно — `trigger_deprecation()` (с `@`)
+  не валит прогон; включение — отдельное решение, может уронить прогоны бандлов.
+- Раскатка шаблонов: копировать файл профиля, который бандл совпадал побайтно на прошлом теге (скрипт сверяет с
+  `git show <old>:templates/<profile>/<file>`), затем `make fix` дважды (cs-fixer и Rector могут разойтись).
+- Локальный `make check` бандлов падает на `composer validate`, если неотслеживаемый `composer.lock` отстал от
+  `composer.json` (в CI его нет) — это не нарушение; проверять `COMPOSER=composer-ci.json composer validate`.
