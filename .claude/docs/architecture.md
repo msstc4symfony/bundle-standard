@@ -230,3 +230,61 @@ interface RuleInterface
   `git show <old>:templates/<profile>/<file>`), затем `make fix` дважды (cs-fixer и Rector могут разойтись).
 - Локальный `make check` бандлов падает на `composer validate`, если неотслеживаемый `composer.lock` отстал от
   `composer.json` (в CI его нет) — это не нарушение; проверять `COMPOSER=composer-ci.json composer validate`.
+
+## v3.2.0 (2026-10-22 UTC): PHPStan per Symfony version
+
+- Шаг `PHPStan against this Symfony version` в job `phpunit`, а не отдельный job: ячейка уже закрепила Symfony
+  (`Pin Symfony version`) и проверила установку (`id: installed`), повторять этот скрипт не нужно. Он идёт только в ячейке
+  `PRIMARY_PHP` + `highest` каждой записи `symfony-versions`, после PHPUnit (`!cancelled()`), с `XDEBUG_MODE=off`
+  (в ячейках включено покрытие). Выключается входом `run-phpstan-per-symfony`; job `matrix` предупреждает о записи без
+  ячейки PHP 8.4 (`PhpunitMatrixTest`).
+- Зачем: job `PHPStan` анализирует установку job'а `setup` — `composer install` по закоммиченному `composer-ci.lock`
+  (он в git у большинства бандлов; без lock — свежее разрешение того дня, когда кэш заполнился): одна версия Symfony
+  (8.1) и версии инструментов из lock, пока его не обновят. (Исправлено 2026-10-22 UTC: сначала здесь было «lock не
+  в git» — неверно для 11 из 13 пакетов.) Замер 2026-10-22 по 13 пакетам на свежей
+  установке:
+  - healthcheck `Redis::set(..., 1)` под PHPStan 2.3 → `['ex' => 1]`;
+  - profiling: тест `getListenerPriority()` под Symfony 7.4;
+  - metrics: код под Elastica 7 и 8/9 одновременно не анализируется против одной установки → в его `checks.yml`
+    `run-phpstan-per-symfony: false`.
+  Из всех находок только одна (profiling) вызвана версией Symfony, остальные — дрейф зависимостей.
+
+## v3.3.0 (2026-10-22 UTC): вид пакета `library`
+
+- `PackageKind` (`bundle` | `library`) читается как профиль: `composer.json` → `extra.bundle-standard.kind`, нет
+  ключа/файла/битый JSON → `Bundle`, неизвестное или нестроковое значение → `null`, его сообщает `PackageKindRule`
+  (JSON из `declaration()`); CLI тогда проверяет остальное как бандл. Чтение `extra.bundle-standard.<key>` общее —
+  `ComposerManifest::standardSetting()` (им же пользуется `RuntimeProfile`). Вид и профиль ортогональны: `php74`
+  пропускает правила раскладки при любом виде.
+- `SourceLayoutRule(Library)`: слои без `DependencyInjection` (в `deptrac-library.yaml` нет такого слоя — классы там
+  были бы вне всех слоёв), плюс `Resources/`; `<Name>Bundle.php` — отдельное нарушение, проверки «ровно один бандл»
+  нет. Проверки `src/Domain/`, dot-каталогов и классов под `Resources/` те же.
+- `DeptracConfigRule($template, $kind)` называет в сообщениях файл шаблона по `basename()` пути. Вид не выводится из
+  содержимого шаблона: у `Library` бандл-класс не выводится вовсе (нет «cannot derive», нет хвоста «with the
+  BundleRoot value …»). `canonical()` бросает `StandardTemplateException`, если слой `BundleRoot` и плейсхолдер
+  `%BUNDLE_CLASS_PATTERN%` встречаются не вместе или шаблон не того вида (у бандла `BundleRoot` есть, у библиотеки
+  нет). Списки YAML сужаются `nodeList()` (элементы — `YamlValue`), поэтому файл чист на PHPStan level 10.
+- `CompilerPassLocationRule(Library)` сообщает о каждом pass'е, в том числе в `src/DependencyInjection/CompilerPass/`:
+  совет «перенести туда» противоречил бы `SourceLayoutRule(Library)`. `src/DependencyInjection` в библиотеке получает
+  собственное сообщение (container extension layer), а не общее «not a canonical layer directory». `DeptracConfigRuleTest` сверяет разобранные YAML: библиотечный шаблон =
+  канон без слоёв `DependencyInjection`/`BundleRoot`, их ключей ruleset и упоминаний в списках.
+- `ComposerManifestRule(kind: Library)` пропускает только `extra.symfony.require` и `conflict.symfony/symfony`;
+  ограничения `symfony/*` в `require`, если они есть, проверяются как обычно.
+- Workflow, шаг `Pin Symfony version`: вид читается `jq` из `composer.json` (не из `composer-ci.json`, хотя
+  `COMPOSER=composer-ci.json`) — как профиль в job `matrix`/`minimal`. У библиотеки нет kernel core; закрепляются
+  только перечисленные `symfony/*`. Шаг пишет `SYMFONY_PROBE` в `$GITHUB_ENV`: `symfony/http-kernel` у бандла, первый
+  закреплённый пакет у библиотеки (`sort -u | sed -n 1p`: `head -n1` при `pipefail` мог бы получить SIGPIPE), `none`, если закреплять нечего (пустое значение не используется: не полагаемся на
+  то, как пустая переменная проходит через `GITHUB_ENV`). `Assert …` берёт `${SYMFONY_PROBE:-symfony/http-kernel}`,
+  на `none` завершается успехом — поэтому `steps.installed.outcome == 'success'` у шага PHPStan не поменялся.
+  Скрипты исполняет `SymfonyPinTest` со стабом `composer` (нужны `jq` и `php`).
+- Без пина Symfony в библиотеке без Symfony все записи `symfony-versions` дают одинаковые ячейки — README советует
+  одну запись `{"version":"none","label":"none","codecov":true}` без `php`. Версия всё равно попадает в имя проверки
+  (`PHPUnit (PHP 8.4, Symfony none)` → required checks), label — в ключ кэша `vendor`; появится Symfony-компонент —
+  `composer require …:none` упадёт с «Could not parse version constraint none». `PhpunitMatrixTest` проверяет, что
+  такая запись даёт ячейки без предупреждений codecov и PHPStan.
+- `PackageKindRule`/`RuntimeProfileRule`: нет объявления (`declaration() === null`) → нарушения нет; бывший
+  `?? 'nothing'` был недостижим. `ComposerManifest::standardSetting()` возвращает `JsonValue` (`@phpstan-type`;
+  рекурсивных алиасов в PHPStan нет, элементы массива — `mixed`).
+- `SymfonyPinTest` и при отсутствии `jq` падает, а не пропускается, если задан `CI`.
+- Эталон-библиотека в соседнем checkout — `sql-labeller`.
+
