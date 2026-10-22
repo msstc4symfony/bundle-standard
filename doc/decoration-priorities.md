@@ -11,6 +11,7 @@ framework's own decorator.
 | -10 | `mock_response_factory` (FrameworkBundle, functional tests) | symfony/framework-bundle |
 | -15 | `TraceHttpClientDecorator` — adds `traceparent`, `tracestate`, `baggage` | msstc4symfony/tracing-bundle |
 | -20 | `HttpClientDecorator` — counts requests and their duration | msstc4symfony/metrics-bundle |
+| -25 | `ProfilingHttpClient` — a detached `http <METHOD> <host>` span per request (`auto_spans.http_client`, 2.2) | msstc4symfony/profiling-bundle |
 
 Rules:
 
