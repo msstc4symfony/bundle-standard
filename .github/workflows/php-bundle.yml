@@ -90,7 +90,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: msstc4symfony/bundle-standard
-          ref: v3.2.0
+          ref: v3.3.0
           path: standard
 
       - uses: shivammathur/setup-php@v2
@@ -389,6 +389,9 @@ jobs:
         # component drifts to another major. Packages outside the lockstep monorepo versioning
         # (monolog-bundle, phpunit-bridge, flex, maker-bundle, polyfills, contracts) are left alone.
         # dom-crawler follows browser-kit: a mismatch fatals WebTestCase's HttpKernelBrowser.
+        # A library (extra.bundle-standard.kind "library") gets no kernel core, which would add a framework it
+        # does not use; one without Symfony components pins nothing. SYMFONY_PROBE names the package whose version
+        # "Assert the matrix Symfony version was installed" checks ("none": nothing was pinned).
         run: |
           set -f  # keep "8.*" from being glob-expanded
           listed=$(php -r '
@@ -401,8 +404,19 @@ jobs:
                     echo "symfony/dom-crawler", PHP_EOL;
                 }
             }')
-          packages=$(printf '%s\n' symfony/framework-bundle symfony/console symfony/http-kernel \
-            symfony/dependency-injection symfony/config ${listed} | sort -u)
+          core="symfony/framework-bundle symfony/console symfony/http-kernel symfony/dependency-injection symfony/config"
+          probe=symfony/http-kernel
+          if [ "$(jq -r '.extra["bundle-standard"].kind // "bundle"' composer.json)" = library ]; then
+            core=""
+            probe=$(printf '%s\n' ${listed} | sort -u | sed -n 1p)
+            probe="${probe:-none}"
+          fi
+          packages=$(printf '%s\n' ${core} ${listed} | sort -u)
+          echo "SYMFONY_PROBE=${probe}" >> "$GITHUB_ENV"
+          if [ -z "${packages}" ]; then
+            echo "No Symfony package to pin: the library requires none"
+            exit 0
+          fi
           echo "Pinning to ${SYMFONY_VERSION}:" ${packages}
           composer require --no-update --no-interaction $(printf '%s:'"${SYMFONY_VERSION}"' ' ${packages})
 
@@ -423,10 +437,15 @@ jobs:
         env:
           SYMFONY_LABEL: ${{ matrix.symfony.label }}
         run: |
-          installed=$(composer show symfony/http-kernel --format=json | jq -r '.versions[0]')
+          probe="${SYMFONY_PROBE:-symfony/http-kernel}"
+          if [ "${probe}" = none ]; then
+            echo "No Symfony package was pinned: nothing to assert"
+            exit 0
+          fi
+          installed=$(composer show "${probe}" --format=json | jq -r '.versions[0]')
           case "$installed" in
-            "v${SYMFONY_LABEL}".*) echo "symfony/http-kernel ${installed}" ;;
-            *) echo "::error::Matrix expects Symfony ${SYMFONY_LABEL}, resolved symfony/http-kernel ${installed}: a dependency forces another Symfony major"; exit 1 ;;
+            "v${SYMFONY_LABEL}".*) echo "${probe} ${installed}" ;;
+            *) echo "::error::Matrix expects Symfony ${SYMFONY_LABEL}, resolved ${probe} ${installed}: a dependency forces another Symfony major"; exit 1 ;;
           esac
 
       - run: XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit junit.xml

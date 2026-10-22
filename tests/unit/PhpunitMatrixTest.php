@@ -150,6 +150,21 @@ final class PhpunitMatrixTest extends TestCase
         self::assertStringNotContainsString('with Symfony 7.4', $output);
     }
 
+    public function testASingleNoneEntryOfALibraryCoversEveryPhpWithoutWarnings(): void
+    {
+        file_put_contents($this->bundleDir . '/composer.json', '{"extra": {"bundle-standard": {"kind": "library"}}}');
+        $none = '[{"version":"none","label":"none","codecov":true}]';
+
+        self::assertSame(
+            ['8.2/none/highest', '8.3/none/highest', '8.4/none/highest', '8.5/none/highest', '8.2/none/lowest'],
+            $this->cells(self::defaultInput('php-versions'), $none, 'true'),
+        );
+
+        [$exitCode, $output] = $this->runScript(self::defaultInput('php-versions'), $none, 'true', 'true', 'true');
+        self::assertSame(0, $exitCode, $output);
+        self::assertStringNotContainsString('::warning::', $output);
+    }
+
     public function testFailsWhenNoCellRemains(): void
     {
         [$exitCode, $output] = $this->runScript('["8.2"]', '[{"version":"8.*","label":"8","codecov":true,"php":"8.4"}]', 'true');

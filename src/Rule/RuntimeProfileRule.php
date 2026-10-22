@@ -10,18 +10,22 @@ use Override;
 
 final readonly class RuntimeProfileRule implements RuleInterface
 {
+    private const string MESSAGE = 'extra.bundle-standard.runtime must be %s, found %s';
+
     #[Override]
     public function check(string $bundlePath): array
     {
-        if (RuntimeProfile::declaredBy($bundlePath) instanceof RuntimeProfile) {
+        // An absent declaration is the default profile.
+        $declaration = RuntimeProfile::declaration($bundlePath);
+        if ($declaration === null || RuntimeProfile::declaredBy($bundlePath) instanceof RuntimeProfile) {
             return [];
         }
 
-        $known = implode(' or ', array_map(static fn (RuntimeProfile $profile): string => '"' . $profile->value . '"', RuntimeProfile::cases()));
+        $known = implode(' or ', array_map(
+            static fn (RuntimeProfile $profile): string => '"' . $profile->value . '"',
+            RuntimeProfile::cases(),
+        ));
 
-        return [new Violation(
-            'composer.json',
-            sprintf('extra.bundle-standard.runtime must be %s, found %s', $known, RuntimeProfile::declaration($bundlePath) ?? 'nothing'),
-        )];
+        return [new Violation('composer.json', \sprintf(self::MESSAGE, $known, $declaration))];
     }
 }

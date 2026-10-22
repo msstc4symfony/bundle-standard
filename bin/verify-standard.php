@@ -3,6 +3,7 @@
 
 declare(strict_types=1);
 
+use Msstc4Symfony\BundleStandard\PackageKind;
 use Msstc4Symfony\BundleStandard\RuntimeProfile;
 use Msstc4Symfony\BundleStandard\StandardDefinition;
 use Msstc4Symfony\BundleStandard\StandardTemplateException;
@@ -32,9 +33,10 @@ if (!is_string($bundlePath) || !is_dir($bundlePath)) {
 }
 
 $bundlePath = rtrim((string) realpath($bundlePath), '/');
-// An unknown profile is reported by RuntimeProfileRule; the rest is checked against the default one.
+// An unknown profile or kind is reported by its rule; the rest is checked against the default one.
 $profile = RuntimeProfile::declaredBy($bundlePath) ?? RuntimeProfile::Php82;
-$verifier = new Verifier(StandardDefinition::rules(__DIR__ . '/../templates', $profile));
+$kind = PackageKind::declaredBy($bundlePath) ?? PackageKind::Bundle;
+$verifier = new Verifier(StandardDefinition::rules(__DIR__ . '/../templates', $profile, $kind));
 
 try {
     $violations = $verifier->verify($bundlePath);

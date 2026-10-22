@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Msstc4Symfony\BundleStandard\Rule;
 
 use Msstc4Symfony\BundleStandard\BundleClass;
+use Msstc4Symfony\BundleStandard\PackageKind;
 use Msstc4Symfony\BundleStandard\StandardTemplateException;
 use Msstc4Symfony\BundleStandard\Violation;
 use Override;
@@ -12,7 +13,8 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * deptrac.yaml declares the canonical layers; a bundle may only narrow the canonical ruleset.
+ * deptrac.yaml declares the canonical layers; a bundle may only narrow the canonical ruleset. A bundle's template has
+ * a BundleRoot layer whose value is the placeholder, a library's template has neither.
  *
  * A node of parsed YAML: mappings and lists hold nodes of the same kind.
  *
@@ -24,15 +26,16 @@ final readonly class DeptracConfigRule implements RuleInterface
 
     private const string FILE = 'deptrac.yaml';
 
-    private const string TEMPLATE = 'bundle-standard templates/deptrac.yaml';
-
     private const array ALLOWED_KEYS = ['paths', 'layers', 'ruleset'];
+
+    private const string BUNDLE_ROOT_LAYER = 'BundleRoot';
 
     /**
      * @param non-empty-string $templateFile
      */
     public function __construct(
         private string $templateFile,
+        private PackageKind $kind = PackageKind::Bundle,
     ) {
     }
 
@@ -41,6 +44,7 @@ final readonly class DeptracConfigRule implements RuleInterface
     {
         // The template is checked first so a broken standard never passes unnoticed.
         [$layers, $ruleset] = $this->canonical();
+        $template = 'bundle-standard templates/' . basename($this->templateFile);
 
         $file = $bundlePath . '/' . self::FILE;
         if (!is_file($file)) {
@@ -63,7 +67,7 @@ final readonly class DeptracConfigRule implements RuleInterface
             ...$this->checkRootKeys($parsed),
             ...$this->checkKeys($config),
             ...$this->checkPaths($config),
-            ...$this->checkLayers($bundlePath, $config, $layers),
+            ...$this->checkLayers($bundlePath, $config, $layers, $template),
             ...$this->checkRuleset($config, $ruleset),
         ];
     }
@@ -82,11 +86,13 @@ final readonly class DeptracConfigRule implements RuleInterface
         }
 
         $config = is_array($template) ? ($template['deptrac'] ?? null) : null;
-        $layers = is_array($config) ? ($config['layers'] ?? null) : null;
+        $layers = self::nodeList(is_array($config) ? ($config['layers'] ?? null) : null);
         $rules = is_array($config) ? ($config['ruleset'] ?? null) : null;
-        if (!is_array($layers) || !array_is_list($layers) || !is_array($rules)) {
+        if ($layers === null || !is_array($rules)) {
             throw new StandardTemplateException(\sprintf('Template "%s" has no deptrac.layers list or deptrac.ruleset.', $this->templateFile));
         }
+
+        $this->checkTemplateKind($layers);
 
         $ruleset = [];
         foreach ($rules as $layer => $dependencies) {
@@ -159,8 +165,12 @@ final readonly class DeptracConfigRule implements RuleInterface
      *
      * @return list<Violation>
      */
-    private function checkLayers(string $bundlePath, array $config, array $canonical): array
+    private function checkLayers(string $bundlePath, array $config, array $canonical, string $template): array
     {
+        if ($this->kind === PackageKind::Library) {
+            return self::compareLayers($config, $canonical, null, $template, '');
+        }
+
         // A missing or ambiguous bundle file is SourceLayoutRule's to report; the other layers are still compared.
         $hasBundleFile = BundleClass::file($bundlePath) !== null;
         $bundleClass = $hasBundleFile ? BundleClass::of($bundlePath) : null;
@@ -173,7 +183,7 @@ final readonly class DeptracConfigRule implements RuleInterface
 
         // classLike collectors take an unanchored, case-insensitive regex: anchor it, escape the separators.
         $pattern = $bundleClass === null ? null : '^' . str_replace('\\', '\\\\', $bundleClass) . '$';
-        $hint = $pattern ?? 'set to the bundle class';
+        $hint = ', with the BundleRoot value ' . ($pattern ?? 'set to the bundle class');
         $expected = $canonical;
         array_walk_recursive($expected, static function (mixed &$value) use ($pattern): void {
             if ($value === self::BUNDLE_ROOT_PLACEHOLDER && $pattern !== null) {
@@ -181,13 +191,31 @@ final readonly class DeptracConfigRule implements RuleInterface
             }
         });
 
-        $actual = $config['layers'] ?? null;
-        if (!\is_array($actual) || !array_is_list($actual) || \count($actual) !== \count($expected)) {
-            return [...$violations, new Violation(self::FILE, \sprintf(
-                'deptrac.layers must declare the %d canonical layers of %s, found %d: copy them as-is, with the BundleRoot value %s',
+        return [...$violations, ...self::compareLayers($config, $expected, $pattern, $template, $hint)];
+    }
+
+    /**
+     * @param array<array-key, mixed> $config
+     * @param list<YamlValue> $expected
+     * @param non-empty-string|null $pattern the BundleRoot value; null compares BundleRoot without its value
+     *
+     * @return list<Violation>
+     */
+    private static function compareLayers(
+        array $config,
+        array $expected,
+        ?string $pattern,
+        string $template,
+        string $hint,
+    ): array {
+        $declared = $config['layers'] ?? null;
+        $actual = self::nodeList($declared);
+        if ($actual === null || \count($actual) !== \count($expected)) {
+            return [new Violation(self::FILE, \sprintf(
+                'deptrac.layers must declare the %d canonical layers of %s, found %d: copy them as-is%s',
                 \count($expected),
-                self::TEMPLATE,
-                \is_array($actual) ? \count($actual) : 0,
+                $template,
+                \is_array($declared) ? \count($declared) : 0,
                 $hint,
             ))];
         }
@@ -195,17 +223,68 @@ final readonly class DeptracConfigRule implements RuleInterface
         foreach ($expected as $index => $layer) {
             $declared = $pattern === null ? self::withoutBundleRootValue($actual[$index]) : $actual[$index];
             if (self::sorted($declared) !== self::sorted($layer)) {
-                return [...$violations, new Violation(self::FILE, \sprintf(
-                    'deptrac.layers[%d] (%s) differs from %s: copy the canonical layers as-is, with the BundleRoot value %s',
+                return [new Violation(self::FILE, \sprintf(
+                    'deptrac.layers[%d] (%s) differs from %s: copy the canonical layers as-is%s',
                     $index,
                     \is_array($layer) && \is_string($layer['name'] ?? null) ? $layer['name'] : '?',
-                    self::TEMPLATE,
+                    $template,
                     $hint,
                 ))];
             }
         }
 
-        return $violations;
+        return [];
+    }
+
+    /**
+     * A template of the other kind would compare a bundle without its BundleRoot layer, or a library against one.
+     *
+     * @param list<YamlValue> $layers
+     *
+     * @throws StandardTemplateException
+     */
+    private function checkTemplateKind(array $layers): void
+    {
+        $hasLayer = false;
+        foreach ($layers as $layer) {
+            $hasLayer = $hasLayer || (\is_array($layer) && ($layer['name'] ?? null) === self::BUNDLE_ROOT_LAYER);
+        }
+
+        $hasPlaceholder = false;
+        array_walk_recursive($layers, static function (mixed $value) use (&$hasPlaceholder): void {
+            $hasPlaceholder = $hasPlaceholder || $value === self::BUNDLE_ROOT_PLACEHOLDER;
+        });
+
+        if ($hasLayer !== $hasPlaceholder) {
+            throw new StandardTemplateException(\sprintf('Template "%s" must have both a %s layer and the %s placeholder, or neither.', $this->templateFile, self::BUNDLE_ROOT_LAYER, self::BUNDLE_ROOT_PLACEHOLDER));
+        }
+
+        if ($hasLayer !== ($this->kind === PackageKind::Bundle)) {
+            throw new StandardTemplateException(\sprintf('Template "%s" is not a %s template: a bundle template has the %s layer, a library template does not.', $this->templateFile, $this->kind->value, self::BUNDLE_ROOT_LAYER));
+        }
+    }
+
+    /**
+     * A YAML list whose items are nodes again; null for anything else.
+     *
+     * @return list<YamlValue>|null
+     */
+    private static function nodeList(mixed $value): ?array
+    {
+        if (!\is_array($value) || !array_is_list($value)) {
+            return null;
+        }
+
+        $nodes = [];
+        foreach ($value as $item) {
+            if (!\is_array($item) && !\is_scalar($item) && $item !== null) {
+                return null;
+            }
+
+            $nodes[] = $item;
+        }
+
+        return $nodes;
     }
 
     /**
@@ -218,7 +297,7 @@ final readonly class DeptracConfigRule implements RuleInterface
      */
     private static function withoutBundleRootValue(mixed $layer): array|string|int|float|bool|null
     {
-        if (!\is_array($layer) || ($layer['name'] ?? null) !== 'BundleRoot' || !\is_array($layer['collectors'] ?? null)) {
+        if (!\is_array($layer) || ($layer['name'] ?? null) !== self::BUNDLE_ROOT_LAYER || !\is_array($layer['collectors'] ?? null)) {
             return $layer;
         }
 

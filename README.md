@@ -23,7 +23,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.2.0
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.3.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -56,7 +56,7 @@ The rule set applies three verification strengths, chosen per file:
 | Byte-for-byte match except the `level:` line, which must be `9`, `10` or `max` | `phpstan.dist.neon` | `PhpstanConfigRule` |
 | Key-value check | `.github/workflows/checks.yml`, `composer.json` | `ContainsRule`, `ComposerManifestRule` |
 | Existence / absence | `composer-ci.json`, `phpstan-baseline.neon`, `deptrac.yaml`, `LICENSE`, `SECURITY.md`, `README.md`, `CLAUDE.md`, `psalm.xml` | `FileExistsRule`, `FileAbsentRule` |
-| Layout (not under `php74`) | `deptrac.yaml` (canonical layers, ruleset may only be narrowed, no `exclude_files`/`skip_violations`), `src/` (only the layer directories and `<Name>Bundle.php`), compiler passes only in `src/DependencyInjection/CompilerPass/` | `DeptracConfigRule`, `SourceLayoutRule`, `CompilerPassLocationRule` |
+| Layout (not under `php74`) | `deptrac.yaml` (canonical layers, ruleset may only be narrowed, no `exclude_files`/`skip_violations`), `src/` (only the layer directories and `<Name>Bundle.php`; a [library](#package-kinds) has no bundle class), compiler passes only in `src/DependencyInjection/CompilerPass/` | `DeptracConfigRule`, `SourceLayoutRule`, `CompilerPassLocationRule` |
 
 Tool configuration is identical in every bundle. Bundle specifics live in the
 files made for them:
@@ -154,8 +154,45 @@ Two consequences to know:
 
 - PHPUnit 9.6 cannot tell the package's deprecations from its dependencies', so `convertDeprecationsToExceptions`
   fails the suite on any deprecation a test triggers — on a new PHP that may be a dependency's.
-- A package without Symfony in `require` gains nothing from the Symfony matrix: pass a single entry
-  (`symfony-versions: '[{"version":"7.4.*","label":"7.4","codecov":false}]'`).
+- A package without Symfony in `require` is a library: declare it as one (see [Package kinds](#package-kinds)) and
+  pass the single `none` entry shown there. A bundle that wants a single cell per PHP still needs a real Symfony
+  version in its one entry (`symfony-versions: '[{"version":"7.4.*","label":"7.4","codecov":false}]'`): the cell
+  pins and asserts it.
+
+## Package kinds
+
+A package that is not a Symfony bundle — plain PHP code that other packages use — declares itself a library:
+
+```json
+"extra": {"bundle-standard": {"kind": "library"}}
+```
+
+`kind` is `bundle` when absent; any other value than `bundle` or `library` is a violation, and the rest of the
+package is then checked as a bundle. For a library:
+
+- `src/` holds only `Domain/`, `Application/`, `Infrastructure/`, `Presentation/`, `Framework/` and `Resources/`.
+  A `src/<Name>Bundle.php` is a violation (declare `kind: "bundle"` or remove it), and so is
+  `src/DependencyInjection/`: without a bundle class nothing loads a container extension. For the same reason every
+  compiler pass is a violation, wherever it lives. The `src/Domain/`,
+  dot-directory and `src/Resources/` checks are the same as for a bundle.
+- `deptrac.yaml` is a copy of `templates/deptrac-library.yaml`: `templates/deptrac.yaml` without the
+  `DependencyInjection` and `BundleRoot` layers and their ruleset entries, so there is no placeholder to replace.
+- `composer.json` needs neither `extra.symfony.require` nor `conflict.symfony/symfony = "*"`: a library may not
+  depend on Symfony at all. Every other `composer.json` check applies, including the constraint of any
+  `symfony/*` package it does require.
+
+Kind and runtime profile are independent: a `php74` library skips the layout rules like any `php74` package.
+
+In the PHPUnit cells, the workflow pins a library only to the Symfony components its `composer-ci.json` lists
+(`require` and `require-dev`, the same selection as for a bundle) and skips the kernel core a bundle gets
+(`framework-bundle`, `console`, `http-kernel`, `dependency-injection`, `config`). The cell then asserts the
+installed version of the first pinned package instead of `symfony/http-kernel`. A library without any Symfony
+component pins and asserts nothing, so every `symfony-versions` entry would produce an identical cell: pass a single
+entry without `php`, e.g. `symfony-versions: '[{"version":"none","label":"none","codecov":true}]'`. Nothing is pinned
+to `none`, but the value still shows up in two places. The version is part of the check name
+(`PHPUnit (PHP 8.4, Symfony none)`), and required status checks follow that name. The label is part of the
+`vendor` cache key. If the library later adds a Symfony component, the cell's `composer require symfony/…:none` fails
+with "Could not parse version constraint none": at that point set real versions.
 
 ## Using the reusable workflow (once published)
 
@@ -178,7 +215,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.2.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.3.0
     with:
       slug: msstc4symfony/healthcheck-bundle
     secrets:
@@ -287,7 +324,8 @@ bundle's checkout.
 `templates/deptrac.yaml` is copied too, with its `'%BUNDLE_CLASS_PATTERN%'` replaced by the anchored bundle class
 (`^Msstc4Symfony\\FooBundle\\FooBundle$` as a plain or single-quoted scalar — double quotes would collapse the
 backslashes; the anchors are needed because deptrac applies the value as a regex without them); `DeptracConfigRule` compares its layers and ruleset after
-parsing, so comments and the key order inside a layer may differ. `phpstan.dist.neon` (php82, php84) sets
+parsing, so comments and the key order inside a layer may differ. A library copies `templates/deptrac-library.yaml`
+instead, as-is (see [Package kinds](#package-kinds)). `phpstan.dist.neon` (php82, php84) sets
 `checkMissingOverrideMethodAttribute: true`: every method that overrides a parent or implements an interface
 method carries `#[\Override]`. Rector cannot add it under `withPhpVersion(PHP_82)` (the rule needs PHP 8.3) and
 skips interface methods, so PHPStan enforces it; on PHP 8.2 the attribute class does not exist, which is harmless

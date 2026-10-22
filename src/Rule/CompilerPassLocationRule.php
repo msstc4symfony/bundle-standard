@@ -6,6 +6,7 @@ namespace Msstc4Symfony\BundleStandard\Rule;
 
 use FilesystemIterator;
 use Msstc4Symfony\BundleStandard\BundleFile;
+use Msstc4Symfony\BundleStandard\PackageKind;
 use Msstc4Symfony\BundleStandard\Violation;
 use Override;
 use PhpToken;
@@ -16,7 +17,8 @@ use SplFileInfo;
 /**
  * Every compiler pass lives in src/DependencyInjection/CompilerPass/. Classes are found by tokens, never loaded, so
  * only direct "implements CompilerPassInterface" and "extends <a Symfony ...Pass>" of a class or enum are recognised:
- * a child of the bundle's own abstract pass is not, but that base class itself is.
+ * a child of the bundle's own abstract pass is not, but that base class itself is. A library has no container
+ * extension to register a pass, so every pass in it is reported.
  */
 final readonly class CompilerPassLocationRule implements RuleInterface
 {
@@ -25,6 +27,12 @@ final readonly class CompilerPassLocationRule implements RuleInterface
     private const string PASS_INTERFACE = 'Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface';
 
     private const array NAME_TOKENS = [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED, T_NAME_RELATIVE];
+
+    private const string LIBRARY_REASON = 'a library has no container extension; declare kind "bundle" or remove it';
+
+    public function __construct(private PackageKind $kind = PackageKind::Bundle)
+    {
+    }
 
     #[Override]
     public function check(string $bundlePath): array
@@ -41,7 +49,7 @@ final readonly class CompilerPassLocationRule implements RuleInterface
             }
 
             $relative = 'src/' . substr($file->getPathname(), \strlen($src) + 1);
-            if (str_starts_with($relative, self::LOCATION)) {
+            if ($this->kind === PackageKind::Bundle && str_starts_with($relative, self::LOCATION)) {
                 continue;
             }
 
@@ -52,11 +60,15 @@ final readonly class CompilerPassLocationRule implements RuleInterface
 
         usort($passes, static fn (array $a, array $b): int => [$a[0], $a[1] ?? ''] <=> [$b[0], $b[1] ?? '']);
 
+        $reason = $this->kind === PackageKind::Library
+            ? self::LIBRARY_REASON
+            : 'compiler passes live in ' . self::LOCATION;
+
         return array_map(
             static fn (array $pass): Violation => new Violation($pass[0], \sprintf(
-                'declares %s: compiler passes live in %s',
+                'declares %s: %s',
                 $pass[1] === null ? 'an anonymous compiler pass' : 'compiler pass ' . $pass[1],
-                self::LOCATION,
+                $reason,
             )),
             $passes,
         );

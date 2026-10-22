@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\BundleStandard\Test\Unit\Rule;
 
+use Msstc4Symfony\BundleStandard\PackageKind;
 use Msstc4Symfony\BundleStandard\Rule\SourceLayoutRule;
 use Msstc4Symfony\BundleStandard\Violation;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -17,6 +18,8 @@ final class SourceLayoutRuleTest extends TestCase
     private const string NOT_A_LAYER = 'is not a canonical layer directory or the bundle class (allowed: Domain, Application, Infrastructure, Presentation, Framework, DependencyInjection, Resources, <Name>Bundle.php)';
 
     private const string NOT_A_DOMAIN_DIRECTORY = 'is not a Domain or DomainService directory (allowed: Entity, Document, ValueObject, Enum, Event, Repository, DocumentRepository, Service, Helper, Specification)';
+
+    private const string NOT_A_LIBRARY_LAYER = 'is not a canonical layer directory of a library (allowed: Domain, Application, Infrastructure, Presentation, Framework, Resources)';
 
     protected function setUp(): void
     {
@@ -144,11 +147,71 @@ final class SourceLayoutRuleTest extends TestCase
         );
     }
 
+    public function testAcceptsTheCanonicalLayoutOfALibrary(): void
+    {
+        $this->write('src/.gitkeep', '');
+        foreach (['Domain', 'Application', 'Infrastructure', 'Presentation', 'Framework'] as $dir) {
+            $this->write('src/' . $dir . '/.gitkeep', '');
+        }
+
+        $this->write('src/Resources/schema.json', '{}');
+        $this->write('src/Domain/ValueObject/X.php', '<?php');
+
+        self::assertSame([], $this->violations(PackageKind::Library));
+    }
+
+    public function testAcceptsALibraryWithoutAnyLayerYet(): void
+    {
+        $this->write('src/.gitkeep', '');
+
+        self::assertSame([], $this->violations(PackageKind::Library));
+    }
+
+    public function testReportsABundleClassInALibrary(): void
+    {
+        $this->write('src/FooBundle.php', '<?php');
+        $this->write('src/Application/X.php', '<?php');
+
+        self::assertSame(
+            ['src/FooBundle.php: is a bundle class: a library (extra.bundle-standard.kind "library") has none, declare kind "bundle" or remove it'],
+            $this->violations(PackageKind::Library),
+        );
+    }
+
+    public function testReportsTheBundleLayersAndOtherEntriesInALibrary(): void
+    {
+        $this->write('src/DependencyInjection/FooExtension.php', '<?php');
+        $this->write('src/Helper.php', '<?php');
+
+        self::assertSame([
+            'src/DependencyInjection: is the container extension layer: a library has no bundle class, so nothing loads a container extension; declare kind "bundle" or move the code',
+            'src/Helper.php: ' . self::NOT_A_LIBRARY_LAYER,
+        ], $this->violations(PackageKind::Library));
+    }
+
+    public function testKeepsTheDomainDotDirectoryAndResourcesChecksForALibrary(): void
+    {
+        $this->write('src/.hidden/Evil.php', '<?php');
+        $this->write('src/Domain/Model/Order.php', '<?php');
+        $this->write('src/Resources/Helper/Kind.php', "<?php\n\nenum Kind\n{\n}\n");
+
+        self::assertSame([
+            'src/.hidden: ' . self::NOT_A_LIBRARY_LAYER,
+            'src/Domain/Model: ' . self::NOT_A_DOMAIN_DIRECTORY,
+            'src/Resources/Helper/Kind.php: declares a class outside every layer: move it into a layer directory',
+        ], $this->violations(PackageKind::Library));
+    }
+
+    public function testReportsAMissingSrcOfALibrary(): void
+    {
+        self::assertSame(['src: is missing: the library\'s layers live there'], $this->violations(PackageKind::Library));
+    }
+
     /**
      * @return list<string>
      */
-    private function violations(): array
+    private function violations(PackageKind $kind = PackageKind::Bundle): array
     {
-        return array_map(static fn (Violation $v): string => $v->format(), new SourceLayoutRule()->check($this->bundleDir));
+        return array_map(static fn (Violation $v): string => $v->format(), new SourceLayoutRule($kind)->check($this->bundleDir));
     }
 }

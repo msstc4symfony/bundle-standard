@@ -21,7 +21,7 @@ enum RuntimeProfile: string
      */
     public static function declaredBy(string $bundlePath): ?self
     {
-        $declared = self::rawDeclaration($bundlePath);
+        $declared = ComposerManifest::standardSetting($bundlePath, 'runtime');
 
         if ($declared === null) {
             return self::Php82;
@@ -35,7 +35,7 @@ enum RuntimeProfile: string
      */
     public static function declaration(string $bundlePath): ?string
     {
-        $declared = self::rawDeclaration($bundlePath);
+        $declared = ComposerManifest::standardSetting($bundlePath, 'runtime');
 
         return $declared === null ? null : json_encode($declared, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
     }
@@ -90,18 +90,5 @@ enum RuntimeProfile: string
         $own = $templatesDir . '/' . $this->value . '/' . $file;
 
         return is_file($own) ? $own : $templatesDir . '/' . $file;
-    }
-
-    /**
-     * @return array<array-key, mixed>|bool|float|int|string|null
-     */
-    private static function rawDeclaration(string $bundlePath): array|bool|float|int|string|null
-    {
-        $manifest = ComposerManifest::read($bundlePath);
-        $extra = $manifest['extra'] ?? null;
-        $standard = is_array($extra) ? ($extra['bundle-standard'] ?? null) : null;
-        $runtime = is_array($standard) ? ($standard['runtime'] ?? null) : null;
-
-        return is_array($runtime) || is_scalar($runtime) ? $runtime : null;
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Msstc4Symfony\BundleStandard\Test\Unit\Rule;
 
 use FilesystemIterator;
+use Msstc4Symfony\BundleStandard\PackageKind;
 use Msstc4Symfony\BundleStandard\Rule\ComposerManifestRule;
 use Msstc4Symfony\BundleStandard\RuntimeProfile;
 use Msstc4Symfony\BundleStandard\Violation;
@@ -505,6 +506,40 @@ final class ComposerManifestRuleTest extends TestCase
         );
 
         self::assertContains('must declare extra.symfony.require', $messages);
+    }
+
+    public function testALibraryNeedsNeitherSymfonyRequireNorTheMonorepoConflict(): void
+    {
+        $this->writeManifest([
+            'name' => 'msstc4symfony/money',
+            'license' => 'MIT',
+            'authors' => [self::AUTHOR],
+            'require' => ['php' => '>=8.2'],
+            'extra' => ['bundle-standard' => ['kind' => 'library']],
+            'autoload' => ['psr-4' => ['Msstc4Symfony\\Money\\' => 'src/']],
+        ]);
+
+        self::assertSame([], (new ComposerManifestRule(RuntimeProfile::Php82, PackageKind::Library))->check($this->bundleDir));
+        self::assertSame(
+            ['must declare conflict.symfony/symfony = "*"', 'must declare extra.symfony.require'],
+            array_map(static fn (Violation $v): string => $v->message, (new ComposerManifestRule())->check($this->bundleDir)),
+        );
+    }
+
+    public function testALibraryKeepsTheOtherChecks(): void
+    {
+        $this->writeManifest([
+            'name' => 'msstc4symfony/money',
+            'license' => 'MIT',
+            'authors' => [self::AUTHOR],
+            'require' => ['php' => '>=8.4', 'symfony/yaml' => '^7.0'],
+            'autoload' => ['psr-4' => ['Msstc4Symfony\\Money\\' => 'src/']],
+        ]);
+
+        self::assertSame(
+            ['must require php ">=8.2", found ">=8.4"', 'require.symfony/yaml must use constraint "^7.4|^8.0", found "^7.0"'],
+            array_map(static fn (Violation $v): string => $v->message, (new ComposerManifestRule(kind: PackageKind::Library))->check($this->bundleDir)),
+        );
     }
 
     public function testReportsWhenDecodedManifestIsNotAnObject(): void

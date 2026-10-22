@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\BundleStandard\Test\Unit\Rule;
 
+use Msstc4Symfony\BundleStandard\PackageKind;
 use Msstc4Symfony\BundleStandard\Rule\DeptracConfigRule;
 use Msstc4Symfony\BundleStandard\StandardTemplateException;
 use Msstc4Symfony\BundleStandard\Violation;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Yaml\Yaml;
 
 #[CoversClass(DeptracConfigRule::class)]
 final class DeptracConfigRuleTest extends TestCase
@@ -16,6 +18,8 @@ final class DeptracConfigRuleTest extends TestCase
     use TemporaryBundleTrait;
 
     private const string TEMPLATE = __DIR__ . '/../../../templates/deptrac.yaml';
+
+    private const string LIBRARY_TEMPLATE = __DIR__ . '/../../../templates/deptrac-library.yaml';
 
     private const string BUNDLE_PATTERN = '^Acme\\\\FooBundle\\\\FooBundle$';
 
@@ -199,6 +203,34 @@ final class DeptracConfigRuleTest extends TestCase
         new DeptracConfigRule($this->bundleDir . '/broken-template.yaml')->check($this->bundleDir);
     }
 
+    public function testRejectsATemplateOfTheOtherKind(): void
+    {
+        foreach ([[self::LIBRARY_TEMPLATE, PackageKind::Bundle], [self::TEMPLATE, PackageKind::Library]] as [$template, $kind]) {
+            try {
+                new DeptracConfigRule($template, $kind)->check($this->bundleDir);
+                self::fail('A template of the other kind was accepted: ' . $template);
+            } catch (StandardTemplateException $e) {
+                self::assertStringContainsString(basename($template), $e->getMessage());
+            }
+        }
+    }
+
+    public function testRejectsABundleRootLayerWithoutThePlaceholderAndTheOtherWayRound(): void
+    {
+        $template = (string) file_get_contents(self::TEMPLATE);
+        $this->write('no-placeholder.yaml', str_replace("'" . DeptracConfigRule::BUNDLE_ROOT_PLACEHOLDER . "'", '^Acme\\\\Foo$', $template));
+        $this->write('stray-placeholder.yaml', str_replace('src/Framework/.*', DeptracConfigRule::BUNDLE_ROOT_PLACEHOLDER, (string) file_get_contents(self::LIBRARY_TEMPLATE)));
+
+        foreach ([['no-placeholder.yaml', PackageKind::Bundle], ['stray-placeholder.yaml', PackageKind::Library]] as [$file, $kind]) {
+            try {
+                new DeptracConfigRule($this->bundleDir . '/' . $file, $kind)->check($this->bundleDir);
+                self::fail('An inconsistent template was accepted: ' . $file);
+            } catch (StandardTemplateException $e) {
+                self::assertStringContainsString($file, $e->getMessage());
+            }
+        }
+    }
+
     public function testRejectsAnUnanchoredBundleRoot(): void
     {
         $this->write('deptrac.yaml', str_replace(self::BUNDLE_PATTERN, 'Acme\\\\FooBundle\\\\FooBundle', $this->canonical()));
@@ -215,6 +247,78 @@ final class DeptracConfigRuleTest extends TestCase
             ['deptrac.layers[5] (Framework) differs from bundle-standard templates/deptrac.yaml: copy the canonical layers as-is, with the BundleRoot value set to the bundle class'],
             $this->messages(),
         );
+    }
+
+    public function testAcceptsTheLibraryTemplateWithoutABundleClass(): void
+    {
+        unlink($this->bundleDir . '/src/FooBundle.php');
+        $this->write('composer.json', '{}');
+        $this->write('deptrac.yaml', (string) file_get_contents(self::LIBRARY_TEMPLATE));
+
+        self::assertSame([], $this->messages(self::LIBRARY_TEMPLATE));
+    }
+
+    public function testRejectsTheBundleLayersInALibrary(): void
+    {
+        $this->write('deptrac.yaml', $this->canonical());
+
+        self::assertSame([
+            'deptrac.layers must declare the 6 canonical layers of bundle-standard templates/deptrac-library.yaml, found 8: copy them as-is',
+            'deptrac.ruleset.DependencyInjection: unknown layer',
+            'deptrac.ruleset.BundleRoot: unknown layer',
+        ], $this->messages(self::LIBRARY_TEMPLATE));
+    }
+
+    public function testNamesTheLibraryTemplateForADifferingLayer(): void
+    {
+        $this->write('deptrac.yaml', str_replace('src/Framework/.*', 'src/Integration/.*', (string) file_get_contents(self::LIBRARY_TEMPLATE)));
+
+        self::assertSame(
+            ['deptrac.layers[5] (Framework) differs from bundle-standard templates/deptrac-library.yaml: copy the canonical layers as-is'],
+            $this->messages(self::LIBRARY_TEMPLATE),
+        );
+    }
+
+    public function testTheLibraryTemplateIsTheBundleTemplateWithoutTheBundleLayers(): void
+    {
+        $bundle = self::deptrac(self::TEMPLATE);
+        $library = self::deptrac(self::LIBRARY_TEMPLATE);
+        $bundleOnly = ['DependencyInjection', 'BundleRoot'];
+
+        self::assertIsArray($bundle['layers']);
+        self::assertIsArray($bundle['ruleset']);
+        $expectedRuleset = [];
+        foreach ($bundle['ruleset'] as $layer => $dependencies) {
+            if (!\in_array($layer, $bundleOnly, true)) {
+                $expectedRuleset[$layer] = \is_array($dependencies) ? array_values(array_diff(array_filter($dependencies, is_string(...)), $bundleOnly)) : $dependencies;
+            }
+        }
+
+        self::assertSame(
+            [
+                'paths' => $bundle['paths'],
+                'layers' => array_values(array_filter(
+                    $bundle['layers'],
+                    static fn (mixed $layer): bool => !\is_array($layer) || !\in_array($layer['name'] ?? null, $bundleOnly, true),
+                )),
+                'ruleset' => $expectedRuleset,
+            ],
+            $library,
+        );
+        self::assertStringNotContainsString(DeptracConfigRule::BUNDLE_ROOT_PLACEHOLDER, (string) file_get_contents(self::LIBRARY_TEMPLATE));
+    }
+
+    /**
+     * @return array<array-key, mixed>
+     */
+    private static function deptrac(string $file): array
+    {
+        $parsed = Yaml::parseFile($file);
+        self::assertIsArray($parsed);
+        self::assertSame(['deptrac'], array_keys($parsed));
+        self::assertIsArray($parsed['deptrac']);
+
+        return $parsed['deptrac'];
     }
 
     private function canonical(): string
@@ -234,13 +338,15 @@ final class DeptracConfigRuleTest extends TestCase
     }
 
     /**
+     * @param non-empty-string $template
+     *
      * @return list<string>
      */
-    private function messages(): array
+    private function messages(string $template = self::TEMPLATE): array
     {
         return array_map(
             static fn (Violation $v): string => $v->message,
-            new DeptracConfigRule(self::TEMPLATE)->check($this->bundleDir),
+            new DeptracConfigRule($template, $template === self::LIBRARY_TEMPLATE ? PackageKind::Library : PackageKind::Bundle)->check($this->bundleDir),
         );
     }
 }

@@ -11,6 +11,7 @@ use Msstc4Symfony\BundleStandard\Rule\DeptracConfigRule;
 use Msstc4Symfony\BundleStandard\Rule\ExactFileRule;
 use Msstc4Symfony\BundleStandard\Rule\FileAbsentRule;
 use Msstc4Symfony\BundleStandard\Rule\FileExistsRule;
+use Msstc4Symfony\BundleStandard\Rule\PackageKindRule;
 use Msstc4Symfony\BundleStandard\Rule\PhpstanConfigRule;
 use Msstc4Symfony\BundleStandard\Rule\RuleInterface;
 use Msstc4Symfony\BundleStandard\Rule\RuntimeProfileRule;
@@ -23,18 +24,22 @@ final readonly class StandardDefinition
      *
      * @return list<RuleInterface>
      */
-    public static function rules(string $templatesDir, RuntimeProfile $profile = RuntimeProfile::Php82): array
-    {
+    public static function rules(
+        string $templatesDir,
+        RuntimeProfile $profile = RuntimeProfile::Php82,
+        PackageKind $kind = PackageKind::Bundle,
+    ): array {
         $templatesDir = rtrim($templatesDir, '/');
         if ($templatesDir === '') {
             $templatesDir = '/';
         }
 
         // php74 packages run inside other tools (the DTO generator) and are not hex-layered Symfony bundles.
+        $deptracTemplate = $kind === PackageKind::Library ? 'deptrac-library.yaml' : 'deptrac.yaml';
         $layoutRules = $profile === RuntimeProfile::Php74 ? [] : [
-            new DeptracConfigRule($profile->template($templatesDir, 'deptrac.yaml')),
-            new SourceLayoutRule(),
-            new CompilerPassLocationRule(),
+            new DeptracConfigRule($profile->template($templatesDir, $deptracTemplate), $kind),
+            new SourceLayoutRule($kind),
+            new CompilerPassLocationRule($kind),
         ];
 
         return [
@@ -57,7 +62,8 @@ final readonly class StandardDefinition
             ]),
 
             new RuntimeProfileRule(),
-            new ComposerManifestRule($profile),
+            new PackageKindRule(),
+            new ComposerManifestRule($profile, $kind),
 
             new FileExistsRule('composer-ci.json', 'CI installs the full optional dependency set'),
             new FileExistsRule('phpstan-baseline.neon', 'baseline must be explicit, not implied'),

@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\BundleStandard\Test\Unit;
 
+use Msstc4Symfony\BundleStandard\PackageKind;
 use Msstc4Symfony\BundleStandard\Rule\CompilerPassLocationRule;
 use Msstc4Symfony\BundleStandard\Rule\DeptracConfigRule;
+use Msstc4Symfony\BundleStandard\Rule\PackageKindRule;
 use Msstc4Symfony\BundleStandard\Rule\RuleInterface;
 use Msstc4Symfony\BundleStandard\Rule\SourceLayoutRule;
 use Msstc4Symfony\BundleStandard\RuntimeProfile;
 use Msstc4Symfony\BundleStandard\StandardDefinition;
+use Msstc4Symfony\BundleStandard\Test\Unit\Rule\TemporaryBundleTrait;
 use Msstc4Symfony\BundleStandard\Verifier;
 use Msstc4Symfony\BundleStandard\Violation;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -18,6 +21,8 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(StandardDefinition::class)]
 final class StandardDefinitionTest extends TestCase
 {
+    use TemporaryBundleTrait;
+
     private const string TEMPLATES_DIR = __DIR__ . '/../../templates';
 
     public function testProducesOnlyRuleInstances(): void
@@ -169,6 +174,70 @@ final class StandardDefinitionTest extends TestCase
         self::assertNotContains(CompilerPassLocationRule::class, $classes(RuntimeProfile::Php74));
     }
 
+    public function testAcceptsAMinimalLibrary(): void
+    {
+        $this->createLibrary();
+
+        try {
+            $kind = PackageKind::declaredBy($this->bundleDir);
+            self::assertSame(PackageKind::Library, $kind);
+            $profile = RuntimeProfile::declaredBy($this->bundleDir) ?? RuntimeProfile::Php82;
+
+            self::assertSame([], $this->messages(StandardDefinition::rules(self::TEMPLATES_DIR, $profile, $kind)));
+        } finally {
+            $this->removeBundle();
+        }
+    }
+
+    public function testChecksALibraryAgainstTheBundleRulesWithoutItsKind(): void
+    {
+        $this->createLibrary();
+
+        try {
+            self::assertSame([
+                'composer.json: must declare conflict.symfony/symfony = "*"',
+                'composer.json: must declare extra.symfony.require',
+                'deptrac.yaml: deptrac.layers must declare the 8 canonical layers of bundle-standard templates/deptrac.yaml, found 6: copy them as-is, with the BundleRoot value set to the bundle class',
+                'src: must contain exactly one <Name>Bundle.php, found 0',
+            ], $this->messages(StandardDefinition::rules(self::TEMPLATES_DIR)));
+        } finally {
+            $this->removeBundle();
+        }
+    }
+
+    public function testReportsAnUnknownPackageKind(): void
+    {
+        $bundleDir = sys_get_temp_dir() . '/unknown-kind-' . uniqid('', true);
+        mkdir($bundleDir);
+        file_put_contents($bundleDir . '/composer.json', '{"extra": {"bundle-standard": {"kind": "plugin"}}}');
+
+        try {
+            self::assertContains(
+                'composer.json: extra.bundle-standard.kind must be "bundle" or "library", found "plugin"',
+                $this->messages(StandardDefinition::rules(self::TEMPLATES_DIR), $bundleDir),
+            );
+        } finally {
+            unlink($bundleDir . '/composer.json');
+            rmdir($bundleDir);
+        }
+    }
+
+    public function testAppliesTheLibraryLayoutUnlessThePhp74ProfileSkipsIt(): void
+    {
+        $classes = static fn (RuntimeProfile $profile, PackageKind $kind): array => array_map(
+            static fn (RuleInterface $rule): string => $rule::class,
+            StandardDefinition::rules(self::TEMPLATES_DIR, $profile, $kind),
+        );
+
+        foreach (PackageKind::cases() as $kind) {
+            self::assertContains(PackageKindRule::class, $classes(RuntimeProfile::Php82, $kind));
+            self::assertContains(PackageKindRule::class, $classes(RuntimeProfile::Php74, $kind));
+            self::assertContains(SourceLayoutRule::class, $classes(RuntimeProfile::Php84, $kind));
+            self::assertNotContains(SourceLayoutRule::class, $classes(RuntimeProfile::Php74, $kind));
+            self::assertNotContains(DeptracConfigRule::class, $classes(RuntimeProfile::Php74, $kind));
+        }
+    }
+
     public function testAcceptsTheReferenceBundle(): void
     {
         $reference = __DIR__ . '/../../../skeleton-bundle';
@@ -178,12 +247,59 @@ final class StandardDefinitionTest extends TestCase
         }
 
         $profile = RuntimeProfile::declaredBy($reference) ?? RuntimeProfile::Php82;
-        $violations = (new Verifier(StandardDefinition::rules(self::TEMPLATES_DIR, $profile)))->verify($reference);
+        $kind = PackageKind::declaredBy($reference) ?? PackageKind::Bundle;
+        $violations = (new Verifier(StandardDefinition::rules(self::TEMPLATES_DIR, $profile, $kind)))->verify($reference);
 
         self::assertSame(
             [],
             array_map(static fn (Violation $v): string => $v->format(), $violations),
         );
+    }
+
+    /**
+     * Every file the standard requires, as a library without Symfony would ship it.
+     */
+    private function createLibrary(): void
+    {
+        $this->createBundle();
+
+        $copies = [
+            '.php-cs-fixer.dist.php', 'phpstan-ci.neon', 'phpstan.dist.neon', 'rector.php', 'Makefile', 'phpunit.xml.dist',
+            'infection.json5', 'codecov.yml',
+        ];
+        foreach ($copies as $file) {
+            $this->write($file, (string) file_get_contents(self::TEMPLATES_DIR . '/' . $file));
+        }
+
+        $this->write('.gitignore', (string) file_get_contents(self::TEMPLATES_DIR . '/gitignore'));
+        $this->write('deptrac.yaml', (string) file_get_contents(self::TEMPLATES_DIR . '/deptrac-library.yaml'));
+        $this->write('.github/workflows/checks.yml', "jobs:\n  standard:\n    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.3.0\n");
+        $this->write('composer.json', json_encode([
+            'name' => 'msstc4symfony/money',
+            'license' => 'MIT',
+            'authors' => [['name' => 'Maxim Shamaev', 'email' => 'maxim.shamaev@gmail.com']],
+            'require' => ['php' => '>=8.2'],
+            'autoload' => ['psr-4' => ['Msstc4Symfony\\Money\\' => 'src/']],
+            'autoload-dev' => ['psr-4' => ['Msstc4Symfony\\Money\\Test\\' => 'tests/']],
+            'extra' => ['bundle-standard' => ['kind' => 'library']],
+        ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        foreach (['composer-ci.json' => '{}', 'phpstan-baseline.neon' => '', 'LICENSE' => 'MIT', 'SECURITY.md' => '#', 'README.md' => '#', 'CLAUDE.md' => '#'] as $file => $content) {
+            $this->write($file, $content);
+        }
+
+        $this->write('src/Domain/ValueObject/Money.php', "<?php\n\nnamespace Msstc4Symfony\\Money\\Domain\\ValueObject;\n\nfinal readonly class Money\n{\n}\n");
+        $this->write('src/Resources/currencies.json', '[]');
+    }
+
+    /**
+     * @param list<RuleInterface> $rules
+     * @param non-empty-string|null $bundleDir
+     *
+     * @return list<string>
+     */
+    private function messages(array $rules, ?string $bundleDir = null): array
+    {
+        return array_map(static fn (Violation $v): string => $v->format(), (new Verifier($rules))->verify($bundleDir ?? $this->bundleDir));
     }
 
     /**

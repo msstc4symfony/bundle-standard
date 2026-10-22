@@ -6,6 +6,7 @@ namespace Msstc4Symfony\BundleStandard\Rule;
 
 use FilesystemIterator;
 use JsonException;
+use Msstc4Symfony\BundleStandard\PackageKind;
 use Msstc4Symfony\BundleStandard\RuntimeProfile;
 use Msstc4Symfony\BundleStandard\Violation;
 use Override;
@@ -42,8 +43,10 @@ final readonly class ComposerManifestRule implements RuleInterface
      */
     private const string SINGLE_MAJOR_ALTERNATIVE = '/^(?:[\^~]v?\d+(?:\.\d+){0,2}|v?\d+(?:\.\d+){0,2}|v?\d+(?:\.\d+)?\.\*)$/';
 
-    public function __construct(private RuntimeProfile $profile = RuntimeProfile::Php82)
-    {
+    public function __construct(
+        private RuntimeProfile $profile = RuntimeProfile::Php82,
+        private PackageKind $kind = PackageKind::Bundle,
+    ) {
     }
 
     #[Override]
@@ -74,6 +77,12 @@ final readonly class ComposerManifestRule implements RuleInterface
         /** @var array<string, mixed> $manifest */
         $manifest = $decoded;
 
+        // A library may not depend on Symfony at all: Flex's extra.symfony.require and the monorepo conflict
+        // only matter to a bundle installed into a Symfony application.
+        $bundleChecks = $this->kind === PackageKind::Bundle
+            ? [...$this->checkConflict($manifest), ...$this->checkExtraSymfonyRequire($manifest)]
+            : [];
+
         return [
             ...$this->checkVersionField($manifest),
             ...$this->checkVendor($manifest),
@@ -82,8 +91,7 @@ final readonly class ComposerManifestRule implements RuleInterface
             ...$this->checkPhpConstraint($manifest),
             ...$this->checkDevAutoload($manifest),
             ...$this->checkSymfonyConstraints($manifest),
-            ...$this->checkConflict($manifest),
-            ...$this->checkExtraSymfonyRequire($manifest),
+            ...$bundleChecks,
             ...$this->checkYamlLoaderDependency($bundlePath, $manifest),
         ];
     }

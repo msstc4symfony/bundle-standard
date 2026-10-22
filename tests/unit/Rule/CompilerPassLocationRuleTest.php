@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\BundleStandard\Test\Unit\Rule;
 
+use Msstc4Symfony\BundleStandard\PackageKind;
 use Msstc4Symfony\BundleStandard\Rule\CompilerPassLocationRule;
 use Msstc4Symfony\BundleStandard\Violation;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -296,6 +297,26 @@ final class CompilerPassLocationRuleTest extends TestCase
             PHP);
 
         self::assertSame(['src/Kind.php'], $this->files());
+    }
+
+    public function testReportsEveryCompilerPassOfALibraryWherever(): void
+    {
+        $this->write('src/DependencyInjection/CompilerPass/FooPass.php', <<<'PHP'
+            <?php
+            namespace Acme\DependencyInjection\CompilerPass;
+            use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
+            final class FooPass implements CompilerPassInterface {}
+            PHP);
+        $this->write('src/Infrastructure/BarPass.php', <<<'PHP'
+            <?php
+            namespace Acme\Infrastructure;
+            final class BarPass implements \Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface {}
+            PHP);
+
+        self::assertSame([
+            'src/DependencyInjection/CompilerPass/FooPass.php: declares compiler pass FooPass: a library has no container extension; declare kind "bundle" or remove it',
+            'src/Infrastructure/BarPass.php: declares compiler pass BarPass: a library has no container extension; declare kind "bundle" or remove it',
+        ], array_map(static fn (Violation $v): string => $v->format(), new CompilerPassLocationRule(PackageKind::Library)->check($this->bundleDir)));
     }
 
     /**

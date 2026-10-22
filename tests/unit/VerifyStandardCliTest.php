@@ -28,6 +28,25 @@ final class VerifyStandardCliTest extends TestCase
         self::assertContains('  - composer.json: must require php ">=8.2", found ">=7.4"', $output);
     }
 
+    public function testChecksAnUnknownKindAsABundle(): void
+    {
+        [$exitCode, $output] = $this->verify('{"extra": {"bundle-standard": {"kind": "plugin"}}}');
+
+        self::assertSame(1, $exitCode);
+        self::assertContains('  - composer.json: extra.bundle-standard.kind must be "bundle" or "library", found "plugin"', $output);
+        self::assertContains('  - composer.json: must declare extra.symfony.require', $output);
+        self::assertContains('  - src: is missing: the bundle class and its layers live there', $output);
+    }
+
+    public function testChecksADeclaredLibraryAsALibrary(): void
+    {
+        [$exitCode, $output] = $this->verify('{"extra": {"bundle-standard": {"kind": "library"}}}');
+
+        self::assertSame(1, $exitCode);
+        self::assertNotContains('  - composer.json: must declare extra.symfony.require', $output);
+        self::assertContains("  - src: is missing: the library's layers live there", $output);
+    }
+
     public function testExitsWith2WhenATemplateIsBroken(): void
     {
         $root = sys_get_temp_dir() . '/cli-standard-' . uniqid('', true);
@@ -91,5 +110,24 @@ final class VerifyStandardCliTest extends TestCase
 
         self::assertSame(2, $exitCode);
         self::assertSame('The bundle cannot be read: cannot read src/Infrastructure/LockedPass.php', $output[0] ?? '');
+    }
+
+    /**
+     * @return array{int, list<string>}
+     */
+    private function verify(string $manifest): array
+    {
+        $bundleDir = sys_get_temp_dir() . '/cli-bundle-' . uniqid('', true);
+        mkdir($bundleDir);
+        file_put_contents($bundleDir . '/composer.json', $manifest);
+
+        try {
+            exec(\sprintf('%s %s %s 2>&1', escapeshellarg(PHP_BINARY), escapeshellarg(__DIR__ . '/../../bin/verify-standard.php'), escapeshellarg($bundleDir)), $output, $exitCode);
+        } finally {
+            unlink($bundleDir . '/composer.json');
+            rmdir($bundleDir);
+        }
+
+        return [$exitCode, $output];
     }
 }

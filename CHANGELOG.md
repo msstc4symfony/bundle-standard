@@ -1,5 +1,27 @@
 # Changelog
 
+## 3.3.0 - 2026-10-22
+
+- Added: the `library` package kind, declared as `"extra": {"bundle-standard": {"kind": "library"}}` (default
+  `bundle`). A library's `src/` holds the layer directories without `DependencyInjection/`, plus `Resources/`, and no
+  `<Name>Bundle.php`; its `deptrac.yaml` is the new `templates/deptrac-library.yaml` (the canonical layers without
+  `DependencyInjection` and `BundleRoot`); every compiler pass in it is a violation; its `composer.json` needs neither
+  `extra.symfony.require` nor `conflict.symfony/symfony = "*"`.
+- Added: `PackageKindRule` reports a `kind` other than `bundle` or `library`; the rest of the package is then checked
+  as a bundle.
+- Changed: `StandardDefinition::rules()` takes the kind as a third argument (default `PackageKind::Bundle`);
+  `SourceLayoutRule`, `CompilerPassLocationRule`, `DeptracConfigRule` and `ComposerManifestRule` take it as a
+  constructor argument. `DeptracConfigRule` throws `StandardTemplateException` for a template of the other kind, or
+  one with a `BundleRoot` layer but no `%BUNDLE_CLASS_PATTERN%` placeholder (or the reverse).
+- Changed: the PHPUnit cells of a library pin only the Symfony components its `composer-ci.json` lists, without the
+  kernel core, and assert the version of the first of them; a library without Symfony components pins and asserts
+  nothing. Bundles are pinned and checked as before.
+- Upgrading: bundles change nothing but the tag. A library declares the kind and copies
+  `templates/deptrac-library.yaml` to `deptrac.yaml`. A library without Symfony components passes the single
+  `symfony-versions` entry `[{"version":"none","label":"none","codecov":true}]`. Its version is never pinned, but it
+  names the PHPUnit checks (`PHPUnit (PHP 8.4, Symfony none)`), so update the required status checks. The label is
+  part of the cache key.
+
 ## 3.2.0 - 2026-10-22
 
 - Added: the `run-phpstan-per-symfony` input (default `true`). The PHP 8.4 PHPUnit cell of each `symfony-versions`
