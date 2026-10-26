@@ -48,6 +48,34 @@ final class ReusableWorkflowTest extends TestCase
         }
     }
 
+    public function testNothingIsUploadedToCodecov(): void
+    {
+        $workflow = self::read(self::WORKFLOW);
+
+        self::assertStringNotContainsStringIgnoringCase('codecov', $workflow);
+        self::assertArrayNotHasKey('slug', self::workflowMap('on', 'workflow_call', 'inputs'));
+        self::assertArrayNotHasKey('secrets', self::workflowMap('on', 'workflow_call'));
+        self::assertStringNotContainsStringIgnoringCase('codecov', self::read(self::README));
+    }
+
+    public function testPhpunitCellsRunWithoutCoverage(): void
+    {
+        self::assertSame('vendor/bin/phpunit', self::workflowStepRun('phpunit', 'vendor/bin/phpunit'));
+
+        $setups = 0;
+        foreach (self::workflowMap('jobs', 'phpunit', 'steps') as $step) {
+            self::assertIsArray($step);
+            $uses = $step['uses'] ?? '';
+            if (is_string($uses) && str_starts_with($uses, 'shivammathur/setup-php')) {
+                self::assertIsArray($step['with'] ?? null);
+                self::assertSame('none', $step['with']['coverage'] ?? null);
+                $setups++;
+            }
+        }
+
+        self::assertSame(1, $setups);
+    }
+
     public function testEveryInputIsDocumentedInTheReadme(): void
     {
         $readme = self::read(self::README);
@@ -55,6 +83,17 @@ final class ReusableWorkflowTest extends TestCase
         foreach (array_keys(self::workflowMap('on', 'workflow_call', 'inputs')) as $name) {
             self::assertStringContainsString(sprintf('| `%s` |', $name), $readme);
         }
+    }
+
+    public function testTheReadmeDocumentsNoUndeclaredInput(): void
+    {
+        $readme = self::read(self::README);
+        $table = substr($readme, (int) strpos($readme, 'Inputs (all optional):'));
+        $table = substr($table, 0, (int) strpos($table, "\n\n", (int) strpos($table, '| Input |')));
+        preg_match_all('/^\| `([a-z-]+)` \|/m', $table, $matches);
+
+        self::assertNotEmpty($matches[1]);
+        self::assertSame([], array_values(array_diff($matches[1], array_keys(self::workflowMap('on', 'workflow_call', 'inputs')))));
     }
 
     public function testElasticsearchInputDefaultsToAnEmptyList(): void
@@ -99,7 +138,6 @@ final class ReusableWorkflowTest extends TestCase
         self::assertIsArray($cells);
 
         self::assertSame(['7.4', '8'], array_column($cells, 'label'));
-        self::assertSame([false, true], array_column($cells, 'codecov'));
         // Each Symfony line's own PHP floor: the matrix job skips the cells below it.
         self::assertSame(['8.2', '8.4'], array_column($cells, 'php'));
         self::assertStringNotContainsString('6.4', $default);
@@ -144,7 +182,7 @@ final class ReusableWorkflowTest extends TestCase
             "inputs.run-phpstan-per-symfony && matrix.php == env.PRIMARY_PHP && matrix.dependencies == 'highest' && !cancelled() && steps.installed.outcome == 'success'",
             $phpstan['if'] ?? null,
         );
-        self::assertSame(['XDEBUG_MODE' => 'off'], $phpstan['env'] ?? null);
+        self::assertArrayNotHasKey('env', $phpstan);
         // After the version check, so it never analyses against another Symfony major than the cell's, and after
         // PHPUnit, so a PHPStan finding does not hide the test results.
         self::assertIsInt($installedAt);
@@ -178,7 +216,6 @@ final class ReusableWorkflowTest extends TestCase
                 'PHP_VERSIONS' => '${{ inputs.php-versions }}',
                 'SYMFONY_VERSIONS' => '${{ inputs.symfony-versions }}',
                 'PREFER_LOWEST' => '${{ inputs.run-prefer-lowest }}',
-                'RUN_CODECOV' => '${{ inputs.run-codecov }}',
                 'RUN_PHPSTAN' => '${{ inputs.run-phpstan-per-symfony }}',
             ],
             $env,

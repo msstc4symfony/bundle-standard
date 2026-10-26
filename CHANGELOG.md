@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.0.0 - 2026-10-26
+
+- Removed: Codecov. The workflow has no `slug` and `run-codecov` inputs and no `CODECOV_TOKEN` secret, a
+  `symfony-versions` entry has no `codecov` key (an extra key is ignored), and the standard reports a leftover
+  `codecov.yml` instead of requiring it. The PHPUnit cells run without a coverage driver and write no `coverage.xml` or `junit.xml`;
+  Infection keeps its own coverage run.
+- Changed: the `.gitignore` template drops `/junit.xml`.
+- Upgrading: pin `php-bundle.yml@v4.0.0` and remove `slug`, `run-codecov` and the `secrets:` block from `checks.yml`
+  (GitHub rejects an input or secret the workflow does not declare; `secrets: inherit` is fine), drop the `codecov` keys from `symfony-versions`, delete
+  `codecov.yml` and its `.gitattributes` line, remove `/junit.xml` from `.gitignore` and the Codecov badge from the
+  README. Remove `codecov/*` from the required status checks if branch protection lists them; the `CODECOV_TOKEN`
+  secret and the Codecov app can go too.
+
 ## 3.3.0 - 2026-10-22
 
 - Added: the `library` package kind, declared as `"extra": {"bundle-standard": {"kind": "library"}}` (default

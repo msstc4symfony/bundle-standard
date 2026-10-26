@@ -52,7 +52,6 @@ final readonly class StandardDefinition
             new ExactFileRule('Makefile', $profile->template($templatesDir, 'Makefile')),
             new ExactFileRule('phpunit.xml.dist', $profile->template($templatesDir, 'phpunit.xml.dist')),
             new ExactFileRule('infection.json5', $profile->template($templatesDir, 'infection.json5')),
-            new ExactFileRule('codecov.yml', $profile->template($templatesDir, 'codecov.yml')),
             // Stored without the leading dot so the template itself is not a live ignore file.
             new ExactFileRule('.gitignore', $profile->template($templatesDir, 'gitignore')),
 
@@ -75,6 +74,7 @@ final readonly class StandardDefinition
 
             new FileAbsentRule('psalm.xml', 'the standard uses PHPStan only'),
             new FileAbsentRule('psalm-baseline.xml', 'the standard uses PHPStan only'),
+            new FileAbsentRule('codecov.yml', 'nothing uploads coverage to Codecov since bundle-standard v4.0.0'),
 
             ...$layoutRules,
         ];

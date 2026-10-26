@@ -65,7 +65,7 @@ final class PhpunitMatrixTest extends TestCase
     {
         file_put_contents($this->bundleDir . '/composer.json', sprintf('{"extra": {"bundle-standard": {"runtime": "%s"}}}', $runtime));
 
-        self::assertSame($expected, $this->cells('["7.4","8.2","8.4"]', '[{"version":"6.4.*","label":"6.4","codecov":false}]', 'true'));
+        self::assertSame($expected, $this->cells('["7.4","8.2","8.4"]', '[{"version":"6.4.*","label":"6.4"}]', 'true'));
     }
 
     /**
@@ -89,7 +89,7 @@ final class PhpunitMatrixTest extends TestCase
     {
         self::assertSame(
             ['8.4/8.*/highest', '8.4/8.*/lowest'],
-            $this->cells('["8.2","8.4"]', '[{"version":"8.*","label":"8","codecov":true,"php":"8.4"}]', 'true'),
+            $this->cells('["8.2","8.4"]', '[{"version":"8.*","label":"8","php":"8.4"}]', 'true'),
         );
     }
 
@@ -97,7 +97,7 @@ final class PhpunitMatrixTest extends TestCase
     {
         self::assertSame(
             ['8.4/8.*/highest', 'nightly/8.*/highest'],
-            $this->cells('[8.2,8.4,"nightly"]', '[{"version":"8.*","label":"8","codecov":true,"php":"8.4"}]', 'false'),
+            $this->cells('[8.2,8.4,"nightly"]', '[{"version":"8.*","label":"8","php":"8.4"}]', 'false'),
         );
     }
 
@@ -105,26 +105,15 @@ final class PhpunitMatrixTest extends TestCase
     {
         file_put_contents($this->bundleDir . '/composer.json', '{"extra": {"bundle-standard": {"runtime": "php80"}}}');
 
-        [$exitCode, $output] = $this->runScript('["8.4"]', '[{"version":"8.*","label":"8","codecov":true}]', 'false');
+        [$exitCode, $output] = $this->runScript('["8.4"]', '[{"version":"8.*","label":"8"}]', 'false');
 
         self::assertSame(1, $exitCode);
         self::assertStringContainsString('::error::Unknown runtime profile php80', $output);
     }
 
-    public function testWarnsWhenCodecovIsOnButNoCellUploads(): void
-    {
-        [, $withPrimary] = $this->runScript('["8.4"]', '[{"version":"8.*","label":"8","codecov":true}]', 'false', 'true');
-        [, $withoutPrimary] = $this->runScript('["8.5"]', '[{"version":"8.*","label":"8","codecov":true}]', 'false', 'true');
-        [, $codecovOff] = $this->runScript('["8.5"]', '[{"version":"8.*","label":"8","codecov":true}]', 'false');
-
-        self::assertStringNotContainsString('::warning::', $withPrimary);
-        self::assertStringContainsString('::warning::run-codecov is on but no cell runs PHP 8.4', $withoutPrimary);
-        self::assertStringNotContainsString('::warning::', $codecovOff);
-    }
-
     public function testWarnsForEachSymfonyEntryWithoutAPrimaryPhpCellWhenPhpstanRunsPerSymfony(): void
     {
-        $symfony = '[{"version":"7.4.*","label":"7.4","codecov":false,"php":"8.2"},{"version":"8.*","label":"8","codecov":false,"php":"8.4"}]';
+        $symfony = '[{"version":"7.4.*","label":"7.4","php":"8.2"},{"version":"8.*","label":"8","php":"8.4"}]';
         [, $covered] = $this->runScript('["8.2","8.4"]', $symfony, 'true', runPhpstan: 'true');
         [, $uncovered] = $this->runScript('["8.2","8.5"]', $symfony, 'true', runPhpstan: 'true');
         [, $phpstanOff] = $this->runScript('["8.2","8.5"]', $symfony, 'true');
@@ -140,7 +129,7 @@ final class PhpunitMatrixTest extends TestCase
     {
         [, $output] = $this->runScript(
             '["8.4","8.5"]',
-            '[{"version":"7.4.*","label":"7.4","codecov":false},{"version":"9.*","label":"9","codecov":false,"php":"8.5"}]',
+            '[{"version":"7.4.*","label":"7.4"},{"version":"9.*","label":"9","php":"8.5"}]',
             'false',
             runPhpstan: 'true',
         );
@@ -153,21 +142,21 @@ final class PhpunitMatrixTest extends TestCase
     public function testASingleNoneEntryOfALibraryCoversEveryPhpWithoutWarnings(): void
     {
         file_put_contents($this->bundleDir . '/composer.json', '{"extra": {"bundle-standard": {"kind": "library"}}}');
-        $none = '[{"version":"none","label":"none","codecov":true}]';
+        $none = '[{"version":"none","label":"none"}]';
 
         self::assertSame(
             ['8.2/none/highest', '8.3/none/highest', '8.4/none/highest', '8.5/none/highest', '8.2/none/lowest'],
             $this->cells(self::defaultInput('php-versions'), $none, 'true'),
         );
 
-        [$exitCode, $output] = $this->runScript(self::defaultInput('php-versions'), $none, 'true', 'true', 'true');
+        [$exitCode, $output] = $this->runScript(self::defaultInput('php-versions'), $none, 'true', 'true');
         self::assertSame(0, $exitCode, $output);
         self::assertStringNotContainsString('::warning::', $output);
     }
 
     public function testFailsWhenNoCellRemains(): void
     {
-        [$exitCode, $output] = $this->runScript('["8.2"]', '[{"version":"8.*","label":"8","codecov":true,"php":"8.4"}]', 'true');
+        [$exitCode, $output] = $this->runScript('["8.2"]', '[{"version":"8.*","label":"8","php":"8.4"}]', 'true');
 
         self::assertSame(1, $exitCode);
         self::assertStringContainsString('::error::No php-versions entry', $output);
@@ -198,7 +187,7 @@ final class PhpunitMatrixTest extends TestCase
     /**
      * @return array{int, string}
      */
-    private function runScript(string $phpVersions, string $symfonyVersions, string $preferLowest, string $runCodecov = 'false', string $runPhpstan = 'false'): array
+    private function runScript(string $phpVersions, string $symfonyVersions, string $preferLowest, string $runPhpstan = 'false'): array
     {
         // stderr joins stdout inside bash: one pipe cannot deadlock on a full second one.
         $process = proc_open(
@@ -211,7 +200,6 @@ final class PhpunitMatrixTest extends TestCase
                 'PHP_VERSIONS' => $phpVersions,
                 'SYMFONY_VERSIONS' => $symfonyVersions,
                 'PREFER_LOWEST' => $preferLowest,
-                'RUN_CODECOV' => $runCodecov,
                 'RUN_PHPSTAN' => $runPhpstan,
                 'PRIMARY_PHP' => self::scalar(self::workflowValue('env', 'PRIMARY_PHP')),
                 'GITHUB_OUTPUT' => $this->bundleDir . '/output',

@@ -189,6 +189,24 @@ final class StandardDefinitionTest extends TestCase
         }
     }
 
+    public function testReportsALeftoverCodecovConfig(): void
+    {
+        $this->createLibrary();
+        $this->write('codecov.yml', "coverage: {}\n");
+
+        try {
+            $kind = PackageKind::declaredBy($this->bundleDir) ?? PackageKind::Bundle;
+            $profile = RuntimeProfile::declaredBy($this->bundleDir) ?? RuntimeProfile::Php82;
+
+            self::assertSame(
+                ['codecov.yml: must not exist: nothing uploads coverage to Codecov since bundle-standard v4.0.0'],
+                $this->messages(StandardDefinition::rules(self::TEMPLATES_DIR, $profile, $kind)),
+            );
+        } finally {
+            $this->removeBundle();
+        }
+    }
+
     public function testChecksALibraryAgainstTheBundleRulesWithoutItsKind(): void
     {
         $this->createLibrary();
@@ -265,7 +283,7 @@ final class StandardDefinitionTest extends TestCase
 
         $copies = [
             '.php-cs-fixer.dist.php', 'phpstan-ci.neon', 'phpstan.dist.neon', 'rector.php', 'Makefile', 'phpunit.xml.dist',
-            'infection.json5', 'codecov.yml',
+            'infection.json5',
         ];
         foreach ($copies as $file) {
             $this->write($file, (string) file_get_contents(self::TEMPLATES_DIR . '/' . $file));

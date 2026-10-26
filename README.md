@@ -23,7 +23,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.3.0
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.0.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -52,7 +52,7 @@ The rule set applies three verification strengths, chosen per file:
 
 | Level | Files | Rule |
 |-------|-------|------|
-| Byte-for-byte match | `.php-cs-fixer.dist.php`, `phpstan-ci.neon`, `rector.php`, `Makefile`, `phpunit.xml.dist`, `infection.json5`, `codecov.yml`, `.gitignore` | `ExactFileRule` |
+| Byte-for-byte match | `.php-cs-fixer.dist.php`, `phpstan-ci.neon`, `rector.php`, `Makefile`, `phpunit.xml.dist`, `infection.json5`, `.gitignore` | `ExactFileRule` |
 | Byte-for-byte match except the `level:` line, which must be `9`, `10` or `max` | `phpstan.dist.neon` | `PhpstanConfigRule` |
 | Key-value check | `.github/workflows/checks.yml`, `composer.json` | `ContainsRule`, `ComposerManifestRule` |
 | Existence / absence | `composer-ci.json`, `phpstan-baseline.neon`, `deptrac.yaml`, `LICENSE`, `SECURITY.md`, `README.md`, `CLAUDE.md`, `psalm.xml` | `FileExistsRule`, `FileAbsentRule` |
@@ -65,7 +65,7 @@ files made for them:
 - `phpstan-baseline.neon` — accepted findings, each with a reason (e.g. a test fixture that
   deliberately extends a class from a package that is not installed);
 - `composer.json` / `composer-ci.json` — dependencies and optional libraries;
-- `.github/workflows/checks.yml` — workflow inputs (`slug`, PHP `extensions`, `ini-values`).
+- `.github/workflows/checks.yml` — workflow inputs (PHP `extensions`, `ini-values`).
 
 Every bundle therefore uses the same layout: `src/`, `tests/Unit/` and `tests/Integration/`
 (PHPUnit suites `unit` and `integration`), with `autoload-dev` mapping `<Root>\Test\` to
@@ -156,7 +156,7 @@ Two consequences to know:
   fails the suite on any deprecation a test triggers — on a new PHP that may be a dependency's.
 - A package without Symfony in `require` is a library: declare it as one (see [Package kinds](#package-kinds)) and
   pass the single `none` entry shown there. A bundle that wants a single cell per PHP still needs a real Symfony
-  version in its one entry (`symfony-versions: '[{"version":"7.4.*","label":"7.4","codecov":false}]'`): the cell
+  version in its one entry (`symfony-versions: '[{"version":"7.4.*","label":"7.4"}]'`): the cell
   pins and asserts it.
 
 ## Package kinds
@@ -188,7 +188,7 @@ In the PHPUnit cells, the workflow pins a library only to the Symfony components
 (`framework-bundle`, `console`, `http-kernel`, `dependency-injection`, `config`). The cell then asserts the
 installed version of the first pinned package instead of `symfony/http-kernel`. A library without any Symfony
 component pins and asserts nothing, so every `symfony-versions` entry would produce an identical cell: pass a single
-entry without `php`, e.g. `symfony-versions: '[{"version":"none","label":"none","codecov":true}]'`. Nothing is pinned
+entry without `php`, e.g. `symfony-versions: '[{"version":"none","label":"none"}]'`. Nothing is pinned
 to `none`, but the value still shows up in two places. The version is part of the check name
 (`PHPUnit (PHP 8.4, Symfony none)`), and required status checks follow that name. The label is part of the
 `vendor` cache key. If the library later adds a Symfony component, the cell's `composer require symfony/…:none` fails
@@ -215,23 +215,18 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.3.0
-    with:
-      slug: msstc4symfony/healthcheck-bundle
-    secrets:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.0.0
 ```
 
 `workflow_dispatch` lets you run the checks by hand (`gh workflow run checks.yml --ref main`): a push that only touches Markdown, or a force-push, does not trigger them.
 
 
-Inputs (all optional except `slug`):
+Inputs (all optional):
 
 | Input | Default | Purpose |
 |-------|---------|---------|
-| `slug` | — (required) | `owner/repo`, passed to Codecov uploads. |
 | `php-versions` | `["8.2","8.3","8.4","8.5"]` | JSON array of PHP versions for the PHPUnit matrix, lowest first. |
-| `symfony-versions` | 7.4 (from PHP 8.2) / 8.x (from PHP 8.4), coverage on 8.x | JSON array of `{version,label,codecov,php?}` objects; `php` is the lowest PHP that Symfony installs on (7.4: 8.2, 8: 8.4). |
+| `symfony-versions` | 7.4 (from PHP 8.2) / 8.x (from PHP 8.4) | JSON array of `{version,label,php?}` objects; `php` is the lowest PHP that Symfony installs on (7.4: 8.2, 8: 8.4). |
 | `extensions` | `mbstring, xml, ctype, iconv, intl` | PHP extensions installed for the bundle's test suite. |
 | `ini-values` | `''` | `php.ini` overrides for jobs running bundle code, e.g. `apc.enable_cli=1`. |
 | `run-deptrac` | `true` | Run the DEPTRAC layer-rules job. |
@@ -242,7 +237,6 @@ Inputs (all optional except `slug`):
 | `run-prefer-lowest` | `true` | Add the `--prefer-lowest` PHPUnit cell (see below). |
 | `run-phpstan-per-symfony` | `true` | Run PHPStan again in the PHP 8.4 PHPUnit cell of each `symfony-versions` entry (see below). |
 | `elasticsearch` | `[]` | JSON array of `{elastica,image}`; adds an Elasticsearch integration job per entry (see below). `[]` or an empty string skips it. |
-| `run-codecov` | `false` | Upload coverage and test results to Codecov; requires the `CODECOV_TOKEN` secret. |
 
 Besides the PHPUnit matrix, the workflow runs `PHPUnit without optional libraries`: it installs
 the published `composer.json` only, so `class_exists` / `interface_exists` guards and
@@ -257,7 +251,6 @@ unset. With the default `[]` (or an empty string) the job is skipped and nothing
 
 ```yaml
 with:
-  slug: msstc4symfony/metrics-bundle
   elasticsearch: '[{"elastica":"^7.3","image":"docker.elastic.co/elasticsearch/elasticsearch:7.17.29"},{"elastica":"^8.0","image":"docker.elastic.co/elasticsearch/elasticsearch:8.19.22"}]'
 ```
 
@@ -266,9 +259,8 @@ and drops the pairs below the package's runtime profile (a `php84` package gets 
 the Symfony entry's `php`: set it to the lowest PHP that Symfony line installs on (7.4 → `"8.2"`, 8 → `"8.4"`),
 so the default matrix has no Symfony 8 cell on PHP 8.2 or 8.3. Give `php-versions` as strings: a JSON number
 loses trailing zeros (`8.10` reads as `8.1`). When no pair remains the job fails with an error instead of
-starting an empty matrix; with `run-codecov` on and no cell on PHP 8.4 with a `codecov` Symfony entry, it warns
-that nothing will be uploaded. Each cell removes Roave BC check, DEPTRAC and Infection from the CI manifest
-before resolving: they run in their own jobs on PHP 8.4, and Infection 0.32 does not install on PHP 8.2.
+starting an empty matrix. Each cell runs PHPUnit without a coverage driver (Infection collects its own coverage)
+and removes Roave BC check, DEPTRAC and Infection from the CI manifest before resolving: they run in their own jobs on PHP 8.4, and Infection 0.32 does not install on PHP 8.2.
 
 **PHPStan per Symfony version.** The `PHPStan` job analyses the install of the `setup` job, which is cached by
 the CI manifest: it sees one Symfony version, and the dependency releases of the day the cache was filled. With
@@ -318,7 +310,7 @@ bundle's checkout.
 
 `templates/` holds the reference files that `ExactFileRule` (and, level line aside,
 `PhpstanConfigRule`) compares against byte-for-byte: `.php-cs-fixer.dist.php`, `phpstan-ci.neon`, `phpstan.dist.neon`,
-`rector.php`, `Makefile`, `phpunit.xml.dist`, `infection.json5`, `codecov.yml` and `gitignore`
+`rector.php`, `Makefile`, `phpunit.xml.dist`, `infection.json5` and `gitignore`
 (copied to the bundle as `.gitignore`; stored without the dot so it does not apply here).
 
 `templates/deptrac.yaml` is copied too, with its `'%BUNDLE_CLASS_PATTERN%'` replaced by the anchored bundle class
