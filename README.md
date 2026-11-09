@@ -1,6 +1,6 @@
 # Bundle Standard
 
-Shared quality standard for `msstc4symfony` Symfony bundles.
+Shared quality standard for `msstc4symfony` Symfony bundles and the bundles of `msstc4php` package families.
 
 This repository is the single source of truth for what "compliant with the
 `msstc4symfony` standard" means for a bundle: which files must exist,
@@ -23,7 +23,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.0.0
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.1.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -74,7 +74,7 @@ Every bundle therefore uses the same layout: `src/`, `tests/Unit/` and `tests/In
 The rule set is assembled in `src/StandardDefinition::rules()` and also checks:
 
 - `composer.json` declares no `version` field, lives under the
-  `msstc4symfony` vendor, is licensed MIT, lists
+  `msstc4symfony` or `msstc4php` vendor, is licensed MIT, lists
   `Maxim Shamaev <maxim.shamaev@gmail.com>` among its `authors`, requires
   `php: >=8.2` (`>=8.4` under the `php84` runtime profile, `>=7.4` under `php74`), requires `symfony/yaml` when `src/` uses `YamlFileLoader`, and
   keeps its `autoload-dev` namespace under the package's own root
@@ -215,7 +215,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.0.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.1.0
 ```
 
 `workflow_dispatch` lets you run the checks by hand (`gh workflow run checks.yml --ref main`): a push that only touches Markdown, or a force-push, does not trigger them.

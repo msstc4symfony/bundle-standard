@@ -18,7 +18,12 @@ final readonly class ComposerManifestRule implements RuleInterface
 {
     private const string FILE = 'composer.json';
 
-    private const string VENDOR = 'msstc4symfony';
+    /**
+     * msstc4php: a package family keeps its bundle under the vendor of its plain-library core (msstc4php/vo-base-bundle).
+     *
+     * @var non-empty-list<non-empty-string>
+     */
+    private const array VENDORS = ['msstc4symfony', 'msstc4php'];
 
     private const string AUTHOR_NAME = 'Maxim Shamaev';
 
@@ -128,13 +133,13 @@ final readonly class ComposerManifestRule implements RuleInterface
 
         $vendor = strstr($name, '/', true);
 
-        if ($vendor === self::VENDOR) {
+        if (in_array($vendor, self::VENDORS, true)) {
             return [];
         }
 
         return [new Violation(
             self::FILE,
-            sprintf('must live under the "%s" vendor, found "%s"', self::VENDOR, (string) $vendor),
+            sprintf('must live under the "%s" vendor, found "%s"', implode('" or "', self::VENDORS), (string) $vendor),
         )];
     }
 

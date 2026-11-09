@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.0 - 2026-11-09
+
+- Changed: `ComposerManifestRule` accepts the `msstc4php` vendor next to `msstc4symfony`, for bundles of package
+  families whose core is a plain `msstc4php` library (`msstc4php/vo-base-bundle`).
+- Upgrading: pin `php-bundle.yml@v4.1.0`; nothing else changes.
+
 ## 4.0.0 - 2026-10-26
 
 - Removed: Codecov. The workflow has no `slug` and `run-codecov` inputs and no `CODECOV_TOKEN` secret, a

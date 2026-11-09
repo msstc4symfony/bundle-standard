@@ -135,8 +135,24 @@ final class ComposerManifestRuleTest extends TestCase
         );
 
         self::assertContains('must be licensed MIT, found "proprietary"', $messages);
-        self::assertContains('must live under the "msstc4symfony" vendor, found "hot-ecosystem"', $messages);
+        self::assertContains('must live under the "msstc4symfony" or "msstc4php" vendor, found "hot-ecosystem"', $messages);
         self::assertContains('must require php ">=8.2", found ">=8.1"', $messages);
+    }
+
+    public function testAcceptsTheMsstc4phpVendor(): void
+    {
+        $this->writeManifest([
+            'name' => 'msstc4php/vo-base-bundle',
+            'license' => 'MIT',
+            'authors' => [self::AUTHOR],
+            'require' => ['php' => '>=8.2', 'symfony/framework-bundle' => '^7.4|^8.0'],
+            'conflict' => ['symfony/symfony' => '*'],
+            'extra' => ['symfony' => ['require' => '^7.4|^8.0']],
+            'autoload' => ['psr-4' => ['MSSTC4PHP\\ValueObject\\Bundle\\' => 'src/']],
+            'autoload-dev' => ['psr-4' => ['MSSTC4PHP\\ValueObject\\Bundle\\Tests\\' => 'tests/']],
+        ]);
+
+        self::assertSame([], (new ComposerManifestRule())->check($this->bundleDir));
     }
 
     public function testReportsMissingNameField(): void
