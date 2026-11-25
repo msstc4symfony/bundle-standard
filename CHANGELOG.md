@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.1.1 - 2026-11-25
+
+- Fixed: the `rector.php` templates (default, `php74`, `php84`) skip `PostIncDecToPreIncDecRector` only where the rule
+  still exists. Rector 2.9 removed it, and a skip of a missing rule fails `rector process` ("These rules from
+  $rectorConfig->skip() do not exist"); Rector 2.8 and earlier still skip it as before.
+- Upgrading: copy the new `rector.php` and pin `php-bundle.yml@v4.1.1` (or the templates `ref:`); nothing else changes.
+
 ## 4.1.0 - 2026-11-09
 
 - Changed: `ComposerManifestRule` accepts the `msstc4php` vendor next to `msstc4symfony`, for bundles of package
