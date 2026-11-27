@@ -52,6 +52,14 @@ final class PhpunitMatrixTest extends TestCase
         );
     }
 
+    public function testAPhpMaxLeavesOutTheNewerPhpOfASymfonyEntry(): void
+    {
+        self::assertSame(
+            ['8.5/5.4.*/highest', '8.5/7.4.*/highest', '8.6/7.4.*/highest'],
+            $this->cells('["8.5","8.6"]', '[{"version":"5.4.*","label":"5.4","php-max":"8.5"},{"version":"7.4.*","label":"7.4"}]', 'false'),
+        );
+    }
+
     public function testNoLowestCellWhenTheBundleOptsOut(): void
     {
         self::assertNotContains('8.2/7.4.*/lowest', $this->cells(self::defaultInput('php-versions'), self::defaultInput('symfony-versions'), 'false'));

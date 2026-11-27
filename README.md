@@ -23,7 +23,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.3.0
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.4.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -218,7 +218,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.3.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.4.0
 ```
 
 The standard requires the `schedule` trigger: CI otherwise runs only on a push, and `composer audit` would not see an
@@ -230,7 +230,7 @@ Inputs (all optional):
 | Input | Default | Purpose |
 |-------|---------|---------|
 | `php-versions` | `["8.2","8.3","8.4","8.5","8.6"]` | JSON array of PHP versions for the PHPUnit matrix, lowest first. |
-| `symfony-versions` | 7.4 (from PHP 8.2) / 8.x (from PHP 8.4) | JSON array of `{version,label,php?}` objects; `php` is the lowest PHP that Symfony installs on (7.4: 8.2, 8: 8.4). |
+| `symfony-versions` | 7.4 (from PHP 8.2) / 8.x (from PHP 8.4) | JSON array of `{version,label,php?,php-max?}` objects; `php` is the lowest PHP that Symfony installs on (7.4: 8.2, 8: 8.4), `php-max` the highest PHP to test it with (Symfony 5.4 is out of support and calls `spl_object_hash()`, deprecated on PHP 8.6: `"php-max":"8.5"`). |
 | `extensions` | `mbstring, xml, ctype, iconv, intl` | PHP extensions installed for the bundle's test suite. |
 | `ini-values` | `''` | `php.ini` overrides for jobs running bundle code, e.g. `apc.enable_cli=1`. |
 | `run-deptrac` | `true` | Run the DEPTRAC layer-rules job. |

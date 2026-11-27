@@ -9,7 +9,7 @@ on:
         type: string
         default: '["8.2","8.3","8.4","8.5","8.6"]'
       symfony-versions:
-        description: 'JSON array of {version,label,php?} objects; php is the lowest PHP this Symfony installs on (7.4: 8.2, 8: 8.4), cells below it are skipped'
+        description: 'JSON array of {version,label,php?,php-max?} objects; php is the lowest PHP this Symfony installs on (7.4: 8.2, 8: 8.4), cells below it are skipped; php-max the highest PHP to test it with'
         required: false
         type: string
         default: '[{"version":"7.4.*","label":"7.4","php":"8.2"},{"version":"8.*","label":"8","php":"8.4"}]'
@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: msstc4symfony/bundle-standard
-          ref: v4.3.0
+          ref: v4.4.0
           path: standard
 
       - uses: shivammathur/setup-php@v2
@@ -286,8 +286,8 @@ jobs:
           sparse-checkout-cone-mode: false
 
       # Every PHP x Symfony pair, except those below the package's runtime profile (src/RuntimeProfile.php::
-      # minimalPhp()) or below the Symfony entry's "php" (Symfony 8 needs PHP 8.4): such a cell could never
-      # install. The first remaining pair gets one more cell resolved with --prefer-lowest, proving the declared
+      # minimalPhp()), below the Symfony entry's "php" (Symfony 8 needs PHP 8.4): such a cell could never
+      # install, or above its "php-max" (a Symfony out of support that a newer PHP deprecates). The first remaining pair gets one more cell resolved with --prefer-lowest, proving the declared
       # lower bounds work. A non-numeric version ("nightly") sorts above every numbered one.
       - id: cells
         env:
@@ -307,7 +307,8 @@ jobs:
             --arg floor "${php}" --arg lowest "${PREFER_LOWEST}" '
             def ver: tostring | split(".") | map(tonumber? // 999);
             [ $php[] as $p | $sf[] as $s
-              | select(($p | ver) >= ($floor | ver) and ($p | ver) >= ($s.php // "0" | ver))
+              | select(($p | ver) >= ($floor | ver) and ($p | ver) >= ($s.php // "0" | ver)
+                  and ($s["php-max"] == null or ($p | ver) <= ($s["php-max"] | ver)))
               | {php: $p, symfony: $s, dependencies: "highest"} ]
             | . + (if $lowest == "true" and length > 0 then [.[0] + {dependencies: "lowest"}] else [] end)')
           if [ "${include}" = "[]" ]; then

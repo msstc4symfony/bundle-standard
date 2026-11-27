@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.4.0 - 2026-11-27
+
+- Added: a `symfony-versions` entry may set `php-max`, the highest PHP of the matrix it is tested with. Symfony 5.4 is
+  out of support and calls `spl_object_hash()`, which PHP 8.6 deprecates: `{"version":"5.4.*","label":"5.4","php-max":"8.5"}`.
+- Upgrading: pin `php-bundle.yml@v4.4.0`; nothing else changes.
+
 ## 4.3.0 - 2026-11-27
 
 - Added: PHP 8.6 to the default `php-versions` of the PHPUnit matrix (`["8.2","8.3","8.4","8.5","8.6"]`), with
