@@ -25,6 +25,8 @@ final class StandardDefinitionTest extends TestCase
 
     private const string TEMPLATES_DIR = __DIR__ . '/../../templates';
 
+    private const string CHECKS_HEADER = "on:\n  schedule:\n    - cron: '23 4 * * 1'\n";
+
     public function testProducesOnlyRuleInstances(): void
     {
         $rules = StandardDefinition::rules(self::TEMPLATES_DIR);
@@ -87,7 +89,7 @@ final class StandardDefinitionTest extends TestCase
 
         copy(self::TEMPLATES_DIR . '/Makefile', $bundleDir . '/Makefile');
         mkdir($bundleDir . '/.github/workflows', 0o777, true);
-        file_put_contents($bundleDir . '/.github/workflows/checks.yml', "    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.0.0\n");
+        file_put_contents($bundleDir . '/.github/workflows/checks.yml', self::CHECKS_HEADER . "    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.0.0\n");
 
         try {
             $php74 = $this->files((new Verifier(StandardDefinition::rules(self::TEMPLATES_DIR, RuntimeProfile::Php74)))->verify($bundleDir));
@@ -223,6 +225,21 @@ final class StandardDefinitionTest extends TestCase
         }
     }
 
+    public function testRequiresAWeeklyRunOfTheChecks(): void
+    {
+        $this->createLibrary();
+        $this->write('.github/workflows/checks.yml', "jobs:\n  standard:\n    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.2.0\n");
+
+        try {
+            self::assertContains(
+                '.github/workflows/checks.yml: is missing required settings: schedule:, - cron:',
+                $this->messages(StandardDefinition::rules(self::TEMPLATES_DIR)),
+            );
+        } finally {
+            $this->removeBundle();
+        }
+    }
+
     public function testReportsAnUnknownPackageKind(): void
     {
         $bundleDir = sys_get_temp_dir() . '/unknown-kind-' . uniqid('', true);
@@ -291,7 +308,7 @@ final class StandardDefinitionTest extends TestCase
 
         $this->write('.gitignore', (string) file_get_contents(self::TEMPLATES_DIR . '/gitignore'));
         $this->write('deptrac.yaml', (string) file_get_contents(self::TEMPLATES_DIR . '/deptrac-library.yaml'));
-        $this->write('.github/workflows/checks.yml', "jobs:\n  standard:\n    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.3.0\n");
+        $this->write('.github/workflows/checks.yml', self::CHECKS_HEADER . "jobs:\n  standard:\n    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.3.0\n");
         $this->write('composer.json', json_encode([
             'name' => 'msstc4symfony/money',
             'license' => 'MIT',

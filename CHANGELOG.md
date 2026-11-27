@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.2.0 - 2026-11-27
+
+- Added: `.github/workflows/checks.yml` must run on a `schedule` (`schedule:` with a `- cron:` entry). CI otherwise runs
+  only on a push, so an advisory published after the last push stayed unseen by `composer audit` (eighteen packages
+  carried the Symfony advisories of 2026-11-25 until someone pushed).
+- Upgrading: add to the `on:` of `checks.yml` a weekly run, e.g. `schedule: [{cron: '23 4 * * 1'}]`, and pin
+  `php-bundle.yml@v4.2.0`. From 4.0.x also copy the 4.1.1 `rector.php` of your profile.
+
 ## 4.1.2 - 2026-11-27
 
 - Fixed: `php-bundle.yml` checks the standard out at its own tag (`v4.1.2`); 4.1.1 still verified bundles against the

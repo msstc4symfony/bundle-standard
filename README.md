@@ -23,7 +23,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.1.2
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.2.0
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -203,6 +203,9 @@ name: Checks
 
 on:
   workflow_dispatch:
+  # Weekly, so a new advisory or a broken dependency shows up in a bundle nobody pushes to.
+  schedule:
+    - cron: '23 4 * * 1'
   pull_request:
     paths-ignore: ['**/*.md', LICENSE]
   push:
@@ -215,10 +218,11 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.1.2
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.2.0
 ```
 
-`workflow_dispatch` lets you run the checks by hand (`gh workflow run checks.yml --ref main`): a push that only touches Markdown, or a force-push, does not trigger them.
+The standard requires the `schedule` trigger: CI otherwise runs only on a push, and `composer audit` would not see an
+advisory published after the last one. `workflow_dispatch` lets you run the checks by hand (`gh workflow run checks.yml --ref main`): a push that only touches Markdown, or a force-push, does not trigger them.
 
 
 Inputs (all optional):

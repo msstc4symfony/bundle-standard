@@ -55,9 +55,12 @@ final readonly class StandardDefinition
             // Stored without the leading dot so the template itself is not a live ignore file.
             new ExactFileRule('.gitignore', $profile->template($templatesDir, 'gitignore')),
 
-            // Pinned to a release tag, never @main: see README "Versioning".
+            // Pinned to a release tag, never @main: see README "Versioning". The weekly run catches a new advisory or a
+            // broken dependency in a bundle nobody pushes to.
             new ContainsRule('.github/workflows/checks.yml', [
                 'uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v',
+                'schedule:',
+                '- cron:',
             ]),
 
             new RuntimeProfileRule(),
