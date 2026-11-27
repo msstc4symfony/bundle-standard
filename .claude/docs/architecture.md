@@ -110,8 +110,8 @@ interface RuleInterface
 
 1. **Побайтовое сравнение (`ExactFileRule`)** — все конфиги инструментов
    (с v1.7): `.php-cs-fixer.dist.php`, `phpstan-ci.neon`, `rector.php`,
-   `Makefile`, `phpunit.xml.dist`, `infection.json5`, `codecov.yml`,
-   `.gitignore`. Специфика бандла живёт только в `deptrac.yaml`,
+   `Makefile`, `phpunit.xml.dist`, `infection.json5`,
+   `.gitignore` (`codecov.yml` убран в v4.0.0). Специфика бандла живёт только в `deptrac.yaml`,
    `phpstan-baseline.neon`, composer-манифестах и inputs воркфлоу.
    `phpstan.dist.neon` — то же самое, но через `PhpstanConfigRule`, чтобы
    бандл мог поднять уровень выше 9.
@@ -141,7 +141,7 @@ interface RuleInterface
 - Workflow: задание `minimal` (только `composer.json`) само читает профиль (`jq`, шаг `runtime`) и берёт PHP из таблицы, совпадающей с `RuntimeProfile::minimalPhp()` (`ReusableWorkflowTest` сверяет). При PHP ≠ `PRIMARY_PHP` там же `php -l` по одному файлу: до PHP 8.3 `php -l` проверяет только первый аргумент. Входа `minimal-php` нет — источник один.
 - PHPUnit 9.6 не отличает свои deprecations от чужих: `convertDeprecationsToExceptions` валит сборку и на deprecation зависимости (осознанно, описано в README).
 - Первый пользователь — `msstc4symfony/dto-generator-bridge` (работает в рантайме генератора DTO, PHP ≥ 7.4); ему хватает одной записи `symfony-versions`.
-- Порядок релиза: слияние в `main` → тег на коммит, где `ref:` равен тегу → пуш тега → пуш пакетов, ссылающихся на этот тег. Матрица CI по умолчанию: PHP 8.2–8.5 × Symfony 7.4 / 8 (Symfony 8 только с PHP 8.4, поле `php` в `symfony-versions`), coverage на 8.4 × 8. Пакеты переходят на v2.0.0 только вместе с миграцией на PHP 8.2: verify-standard v2 у пакета с `>=8.4` без `runtime: php84` упадёт.
+- Порядок релиза: слияние в `main` → тег на коммит, где `ref:` равен тегу → пуш тега → пуш пакетов, ссылающихся на этот тег. Матрица CI по умолчанию: PHP 8.2–8.5 × Symfony 7.4 / 8 (Symfony 8 только с PHP 8.4, поле `php` в `symfony-versions`). Пакеты переходят на v2.0.0 только вместе с миграцией на PHP 8.2: verify-standard v2 у пакета с `>=8.4` без `runtime: php84` упадёт.
 
 ## Reusable workflow `php-bundle.yml`
 
@@ -170,8 +170,9 @@ interface RuleInterface
   все пары PHP × Symfony, кроме тех, где PHP ниже PHP профиля (та же таблица, что в `minimal`) или ниже поля
   `php` записи Symfony (сравнение массивов чисел; `tostring`, так что `[8.4]` без кавычек работает;
   нечисловое `nightly` → 999, выше всех), плюс ячейка prefer-lowest = первая оставшаяся пара
-  (`composer update --prefer-lowest --prefer-stable`). Неизвестный профиль (и в `minimal`) или пустой результат → `::error::` и exit 1; `run-codecov` без ячейки PRIMARY_PHP × codecov → `::warning::` (GitHub
-  иначе падает на пустой матрице без объяснения). Скрипт исполняется в `PhpunitMatrixTest` (нужен `jq`). `phpunit`
+  (`composer update --prefer-lowest --prefer-stable`). Неизвестный профиль (и в `minimal`) или пустой результат → `::error::` и exit 1 (GitHub
+  иначе падает на пустой матрице без объяснения). С v4.0.0 Codecov нет: ни входов `slug`/`run-codecov`, ни секрета, ни
+  ключа `codecov` в `symfony-versions` (лишний ключ jq просто игнорирует); PHPUnit-ячейки без xdebug и без clover/junit. Скрипт исполняется в `PhpunitMatrixTest` (нужен `jq`). `phpunit`
   берёт только `include: fromJSON(needs.matrix.outputs.include)`. Имена ячеек не изменились (required
   checks). Отключается `run-prefer-lowest: false`. Ячейки удаляют из `composer-ci.json` roave BC,
   deptrac и Infection (0.32 требует PHP 8.3) — те работают в своих job на 8.4.
@@ -235,8 +236,8 @@ interface RuleInterface
 
 - Шаг `PHPStan against this Symfony version` в job `phpunit`, а не отдельный job: ячейка уже закрепила Symfony
   (`Pin Symfony version`) и проверила установку (`id: installed`), повторять этот скрипт не нужно. Он идёт только в ячейке
-  `PRIMARY_PHP` + `highest` каждой записи `symfony-versions`, после PHPUnit (`!cancelled()`), с `XDEBUG_MODE=off`
-  (в ячейках включено покрытие). Выключается входом `run-phpstan-per-symfony`; job `matrix` предупреждает о записи без
+  `PRIMARY_PHP` + `highest` каждой записи `symfony-versions`, после PHPUnit (`!cancelled()`), без xdebug
+  (`coverage: none` с v4.0.0). Выключается входом `run-phpstan-per-symfony`; job `matrix` предупреждает о записи без
   ячейки PHP 8.4 (`PhpunitMatrixTest`).
 - Зачем: job `PHPStan` анализирует установку job'а `setup` — `composer install` по закоммиченному `composer-ci.lock`
   (он в git у большинства бандлов; без lock — свежее разрешение того дня, когда кэш заполнился): одна версия Symfony
@@ -278,10 +279,10 @@ interface RuleInterface
   на `none` завершается успехом — поэтому `steps.installed.outcome == 'success'` у шага PHPStan не поменялся.
   Скрипты исполняет `SymfonyPinTest` со стабом `composer` (нужны `jq` и `php`).
 - Без пина Symfony в библиотеке без Symfony все записи `symfony-versions` дают одинаковые ячейки — README советует
-  одну запись `{"version":"none","label":"none","codecov":true}` без `php`. Версия всё равно попадает в имя проверки
+  одну запись `{"version":"none","label":"none"}` без `php`. Версия всё равно попадает в имя проверки
   (`PHPUnit (PHP 8.4, Symfony none)` → required checks), label — в ключ кэша `vendor`; появится Symfony-компонент —
   `composer require …:none` упадёт с «Could not parse version constraint none». `PhpunitMatrixTest` проверяет, что
-  такая запись даёт ячейки без предупреждений codecov и PHPStan.
+  такая запись даёт ячейки без предупреждений PHPStan.
 - `PackageKindRule`/`RuntimeProfileRule`: нет объявления (`declaration() === null`) → нарушения нет; бывший
   `?? 'nothing'` был недостижим. `ComposerManifest::standardSetting()` возвращает `JsonValue` (`@phpstan-type`;
   рекурсивных алиасов в PHPStan нет, элементы массива — `mixed`).
