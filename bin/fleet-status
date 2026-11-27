@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# The latest run of every workflow on the default branch of every repository of an organisation, as a Markdown
+# table; exits 1 when one of them failed.
+# Usage: bin/fleet-status <organisation> [markdown file]
+set -euo pipefail
+
+org=${1:?usage: bin/fleet-status <organisation> [markdown file]}
+out=${2:-/dev/stdout}
+red=()
+rows=()
+
+while read -r repo; do
+  branch=$(gh api "repos/$org/$repo" -q .default_branch)
+  # Pushes, schedules and manual runs: Dependabot's own jobs are not the repository's CI.
+  while IFS=$'\t' read -r workflow conclusion url; do
+    [ -n "$workflow" ] || continue
+    case "$conclusion" in
+      success|skipped|neutral|cancelled) result='ok' ;;
+      *) result="**$conclusion**"; red+=("$repo / $workflow") ;;
+    esac
+    rows+=("| $repo | $workflow | $result | [run]($url) |")
+  done < <(gh run list -R "$org/$repo" --branch "$branch" --limit 50 --json workflowName,status,conclusion,event,url \
+    | jq -r '[.[] | select(.status == "completed" and (.event == "push" or .event == "schedule" or .event == "workflow_dispatch"))]
+      | group_by(.workflowName) | map(.[0]) | .[] | [.workflowName, .conclusion, .url] | @tsv')
+done < <(gh repo list "$org" --limit 200 --no-archived --json name -q '.[].name' | sort)
+
+{
+  if [ ${#red[@]} -eq 0 ]; then
+    echo "### CI is green in every repository of $org"
+  else
+    echo "### CI is red: ${#red[@]} workflow(s)"
+    echo
+    printf -- '- %s\n' "${red[@]}"
+  fi
+  echo
+  echo '| Repository | Workflow | Result | Run |'
+  echo '|---|---|---|---|'
+  printf '%s\n' "${rows[@]}"
+} > "$out"
+
+[ ${#red[@]} -eq 0 ]

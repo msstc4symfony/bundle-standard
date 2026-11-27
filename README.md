@@ -310,6 +310,14 @@ dependency: the workflow's `standard-check` job checks out this
 repository at the release tag on its own and runs the verifier against the
 bundle's checkout.
 
+## Fleet status
+
+`.github/workflows/fleet-status.yml` runs `bin/fleet-status` daily at 07:30 UTC (or by hand): it takes the latest
+push, scheduled or manual run of every workflow on the default branch of every repository of the organisation,
+writes them as a table to the run summary and fails when one of them failed. Together with the weekly scheduled
+checks of every bundle, one red run here names every repository that needs attention. Locally:
+`bin/fleet-status msstc4symfony` (needs `gh` and `jq`).
+
 ## Templates
 
 `templates/` holds the reference files that `ExactFileRule` (and, level line aside,

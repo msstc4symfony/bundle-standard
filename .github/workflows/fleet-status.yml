@@ -1,0 +1,22 @@
+name: Fleet status
+
+# One place that turns red when the CI of any repository of the organisation is red: the latest push, scheduled or
+# manual run of every workflow on its default branch. A failed scheduled run notifies whoever last changed the cron.
+on:
+  schedule:
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  fleet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Latest CI run of every repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bin/fleet-status "${GITHUB_REPOSITORY_OWNER}" "$GITHUB_STEP_SUMMARY"
