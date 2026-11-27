@@ -30,7 +30,8 @@ jobs:
           echo "red=$([ "$status" -eq 0 ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
       - name: Open, update or close the issue
         run: |
-          issue=$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number,title -q ".[] | select(.title == \"${TITLE}\") | .number" | head -1)
+          # Not --search: the search index lags behind, and a run right after another would open a second issue.
+          issue=$(gh issue list --state open --limit 200 --json number,title -q ".[] | select(.title == \"${TITLE}\") | .number" | head -1)
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           if [ "${{ steps.report.outputs.red }}" = true ]; then
             { cat report.md; echo; echo "Run: ${run_url}"; } > body.md
