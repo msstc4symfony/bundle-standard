@@ -47,7 +47,7 @@ final class PhpunitMatrixTest extends TestCase
     public function testDefaultsSkipSymfony8BelowPhp84AndAddTheLowestCellOnTheFirstPair(): void
     {
         self::assertSame(
-            ['8.2/7.4.*/highest', '8.3/7.4.*/highest', '8.4/7.4.*/highest', '8.4/8.*/highest', '8.5/7.4.*/highest', '8.5/8.*/highest', '8.2/7.4.*/lowest'],
+            ['8.2/7.4.*/highest', '8.3/7.4.*/highest', '8.4/7.4.*/highest', '8.4/8.*/highest', '8.5/7.4.*/highest', '8.5/8.*/highest', '8.6/7.4.*/highest', '8.6/8.*/highest', '8.2/7.4.*/lowest'],
             $this->cells(self::defaultInput('php-versions'), self::defaultInput('symfony-versions'), 'true'),
         );
     }
@@ -145,7 +145,7 @@ final class PhpunitMatrixTest extends TestCase
         $none = '[{"version":"none","label":"none"}]';
 
         self::assertSame(
-            ['8.2/none/highest', '8.3/none/highest', '8.4/none/highest', '8.5/none/highest', '8.2/none/lowest'],
+            ['8.2/none/highest', '8.3/none/highest', '8.4/none/highest', '8.5/none/highest', '8.6/none/highest', '8.2/none/lowest'],
             $this->cells(self::defaultInput('php-versions'), $none, 'true'),
         );
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.0 - 2026-11-27
+
+- Added: PHP 8.6 to the default `php-versions` of the PHPUnit matrix (`["8.2","8.3","8.4","8.5","8.6"]`), with
+  Symfony 7.4 and 8. The templates are unchanged: PHPStan still analyses for PHP 8.2–8.5.
+- Upgrading: pin `php-bundle.yml@v4.3.0`; nothing else changes. A bundle that cannot run on PHP 8.6 yet sets
+  `php-versions` in its `checks.yml`.
+
 ## 4.2.0 - 2026-11-27
 
 - Added: `.github/workflows/checks.yml` must run on a `schedule` (`schedule:` with a `- cron:` entry). CI otherwise runs

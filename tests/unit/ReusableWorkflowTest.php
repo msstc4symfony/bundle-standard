@@ -191,9 +191,9 @@ final class ReusableWorkflowTest extends TestCase
         self::assertGreaterThan($phpunitAt, $phpstanAt);
     }
 
-    public function testDefaultPhpMatrixCoversPhp82To85(): void
+    public function testDefaultPhpMatrixCoversPhp82To86(): void
     {
-        self::assertSame('["8.2","8.3","8.4","8.5"]', self::workflowValue('on', 'workflow_call', 'inputs', 'php-versions', 'default'));
+        self::assertSame('["8.2","8.3","8.4","8.5","8.6"]', self::workflowValue('on', 'workflow_call', 'inputs', 'php-versions', 'default'));
     }
 
     public function testPhpunitCellsComeFromTheMatrixJob(): void
