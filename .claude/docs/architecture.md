@@ -289,3 +289,13 @@ interface RuleInterface
 - `SymfonyPinTest` и при отсутствии `jq` падает, а не пропускается, если задан `CI`.
 - Эталон-библиотека в соседнем checkout — `sql-labeller`.
 
+
+## 4.2–4.4 и fleet status (2026-11-27 UTC)
+
+- 4.2.0: `checks.yml` обязан иметь `schedule:` + `- cron:` (`ContainsRule`); 4.3.0: PHP 8.6 в `php-versions` по умолчанию
+  (шаблон PHPStan по-прежнему 8.2–8.5); 4.4.0: `php-max` у записи `symfony-versions` (Symfony 5.4 до PHP 8.5 — сама зовёт
+  `spl_object_hash()`, deprecated в 8.6; задано в обоих мостах dto-generator).
+- `bin/fleet-status <org> [md]` + `.github/workflows/fleet-status.yml` (ежедневно 07:30 UTC): последний completed-прогон
+  каждого workflow (push/schedule/workflow_dispatch) на default branch каждого репозитория; падает при красном. Свой
+  workflow `Fleet status` исключён, иначе один красный день держал бы его красным. Тест — `FleetStatusTest` с заглушкой `gh`.
+  Issues в репозитории выключены: сигнал — упавший scheduled-run (письмо автору правки cron).
