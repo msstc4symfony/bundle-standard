@@ -1,7 +1,8 @@
 name: Fleet status
 
 # One place that turns red when the CI of any repository of the organisation is red: the latest push, scheduled or
-# manual run of every workflow on its default branch. A failed scheduled run notifies whoever last changed the cron.
+# manual run of every workflow on its default branch. While something is red, one open issue titled "CI is red"
+# carries the report (updated on every run); it is closed when everything is green again.
 on:
   schedule:
     - cron: '30 7 * * *'
@@ -10,13 +11,37 @@ on:
 permissions:
   contents: read
   actions: read
+  issues: write
 
 jobs:
   fleet:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TITLE: CI is red
     steps:
       - uses: actions/checkout@v5
       - name: Latest CI run of every repository
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bin/fleet-status "${GITHUB_REPOSITORY_OWNER}" "$GITHUB_STEP_SUMMARY"
+        id: report
+        run: |
+          status=0
+          bin/fleet-status "${GITHUB_REPOSITORY_OWNER}" report.md || status=$?
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          echo "red=$([ "$status" -eq 0 ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+      - name: Open, update or close the issue
+        run: |
+          issue=$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number,title -q ".[] | select(.title == \"${TITLE}\") | .number" | head -1)
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          if [ "${{ steps.report.outputs.red }}" = true ]; then
+            { cat report.md; echo; echo "Run: ${run_url}"; } > body.md
+            if [ -n "$issue" ]; then
+              gh issue edit "$issue" --body-file body.md
+            else
+              gh issue create --title "$TITLE" --body-file body.md
+            fi
+          elif [ -n "$issue" ]; then
+            gh issue close "$issue" --comment "Green again: ${run_url}"
+          fi
+      - name: Fail while something is red
+        if: steps.report.outputs.red == 'true'
+        run: exit 1

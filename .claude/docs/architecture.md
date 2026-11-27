@@ -298,4 +298,5 @@ interface RuleInterface
 - `bin/fleet-status <org> [md]` + `.github/workflows/fleet-status.yml` (ежедневно 07:30 UTC): последний completed-прогон
   каждого workflow (push/schedule/workflow_dispatch) на default branch каждого репозитория; падает при красном. Свой
   workflow `Fleet status` исключён, иначе один красный день держал бы его красным. Тест — `FleetStatusTest` с заглушкой `gh`.
-  Issues в репозитории выключены: сигнал — упавший scheduled-run (письмо автору правки cron).
+  Issues включены 2026-11-27 UTC: пока красно — одна открытая issue «CI is red» с отчётом (обновляется каждым прогоном),
+  зелёный прогон её закрывает; сам прогон при красном тоже падает (письмо автору правки cron).

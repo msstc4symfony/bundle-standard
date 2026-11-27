@@ -314,7 +314,8 @@ bundle's checkout.
 
 `.github/workflows/fleet-status.yml` runs `bin/fleet-status` daily at 07:30 UTC (or by hand): it takes the latest
 push, scheduled or manual run of every workflow on the default branch of every repository of the organisation,
-writes them as a table to the run summary and fails when one of them failed. Together with the weekly scheduled
+writes them as a table to the run summary and fails when one of them failed. While something is red, one open issue
+titled "CI is red" carries the report (updated on every run); the run that finds everything green closes it. Together with the weekly scheduled
 checks of every bundle, one red run here names every repository that needs attention. Locally:
 `bin/fleet-status msstc4symfony` (needs `gh` and `jq`).
 
