@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.1.2 - 2026-11-27
+
+- Fixed: `php-bundle.yml` checks the standard out at its own tag (`v4.1.2`); 4.1.1 still verified bundles against the
+  4.1.0 templates, so a bundle with the 4.1.1 `rector.php` failed "Standard compliance".
+- Fixed: the vendor cache key carries the ISO week (UTC). Without a lock file the cached vendor never resolved again,
+  so `composer audit` kept failing on versions a newer release had already fixed.
+- Upgrading: pin `php-bundle.yml@v4.1.2`; nothing else changes. Releasing the standard: bump the `ref:` in
+  `php-bundle.yml` together with the tag.
+
 ## 4.1.1 - 2026-11-25
 
 - Fixed: the `rector.php` templates (default, `php74`, `php84`) skip `PostIncDecToPreIncDecRector` only where the rule

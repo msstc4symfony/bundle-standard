@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: msstc4symfony/bundle-standard
-          ref: v4.1.0
+          ref: v4.1.2
           path: standard
 
       - uses: shivammathur/setup-php@v2
@@ -116,8 +116,9 @@ jobs:
           tools: composer:v2
 
       - id: cache-key
-        # The manifest is hashed too: autoload rules live there, not in the lock.
-        run: echo "value=vendor-${{ runner.os }}-php${{ env.PRIMARY_PHP }}-${{ hashFiles('composer-ci.json', 'composer-ci.lock') }}" >> "$GITHUB_OUTPUT"
+        # The manifest is hashed too: autoload rules live there, not in the lock. The ISO week makes the vendor of a
+        # lock-less bundle resolve again weekly, so new releases and security advisories are picked up.
+        run: echo "value=vendor-${{ runner.os }}-php${{ env.PRIMARY_PHP }}-$(date -u +%G-%V)-${{ hashFiles('composer-ci.json', 'composer-ci.lock') }}" >> "$GITHUB_OUTPUT"
 
       - id: vendor-cache
         uses: actions/cache@v5

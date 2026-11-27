@@ -23,7 +23,7 @@ pin the exact tag, never `@main`: an error pushed to this repository's `main`
 would otherwise break CI in every bundle that depends on it at once.
 
 ```yaml
-uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.1.0
+uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.1.2
 ```
 
 GitHub resolves `@…` to a literal ref, not a version range, so upgrading the
@@ -215,7 +215,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.1.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v4.1.2
 ```
 
 `workflow_dispatch` lets you run the checks by hand (`gh workflow run checks.yml --ref main`): a push that only touches Markdown, or a force-push, does not trigger them.
