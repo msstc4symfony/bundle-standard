@@ -48,6 +48,7 @@ final class FleetStatusTest extends TestCase
                 ['workflowName' => 'CI', 'status' => 'completed', 'conclusion' => 'success', 'event' => 'schedule', 'url' => 'u1'],
                 ['workflowName' => 'CI', 'status' => 'completed', 'conclusion' => 'failure', 'event' => 'push', 'url' => 'u2'],
                 ['workflowName' => 'Dependabot', 'status' => 'completed', 'conclusion' => 'failure', 'event' => 'dynamic', 'url' => 'u3'],
+                ['workflowName' => 'Fleet status', 'status' => 'completed', 'conclusion' => 'failure', 'event' => 'schedule', 'url' => 'u5'],
             ],
             'beta' => [
                 ['workflowName' => 'Checks', 'status' => 'completed', 'conclusion' => 'failure', 'event' => 'push', 'url' => 'u4'],
@@ -61,6 +62,7 @@ final class FleetStatusTest extends TestCase
         self::assertStringContainsString('| alpha | CI | ok | [run](u1) |', $report);
         self::assertStringContainsString('| beta | Checks | **failure** | [run](u4) |', $report);
         self::assertStringNotContainsString('Dependabot', $report);
+        self::assertStringNotContainsString('Fleet status', $report);
     }
 
     public function testAllGreenExitsZero(): void

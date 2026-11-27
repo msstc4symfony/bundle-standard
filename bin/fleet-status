@@ -13,7 +13,8 @@ while read -r repo; do
   branch=$(gh api "repos/$org/$repo" -q .default_branch)
   # Pushes, schedules and manual runs: Dependabot's own jobs are not the repository's CI.
   while IFS=$'\t' read -r workflow conclusion url; do
-    [ -n "$workflow" ] || continue
+    # Its own last run would keep it red after any red day.
+    [ -n "$workflow" ] && [ "$workflow" != 'Fleet status' ] || continue
     case "$conclusion" in
       success|skipped|neutral|cancelled) result='ok' ;;
       *) result="**$conclusion**"; red+=("$repo / $workflow") ;;
